@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Catálogo | IAGO Shopping</title>
+  <link rel="stylesheet" href="./css/style.css">
+</head>
+<body data-page="catalog">
+  <div class="app-shell">
+    <header class="app-header">
+      <a class="brand-mark" href="./index.html" aria-label="IAGO Shopping">
+        <img src="./assets/logos/Logo_IAGO_completa_branca.png" alt="IAGO" class="brand-logo">
+        <span class="brand-divider"></span>
+        <span class="brand-product">Shopping</span>
+      </a>
+
+      <nav class="top-nav" aria-label="Navegação principal">
+        <a href="./index.html">Entrada</a>
+        <a href="./catalogo.html" aria-current="page">Catálogo</a>
+        <a href="./admin.html">Admin</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="catalog-section" id="catalogo" aria-labelledby="catalog-title">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow">Catálogo comercial</span>
+            <h1 id="catalog-title">Produtos publicados por categoria</h1>
+          </div>
+          <p>Produtos publicados com estoque real por variação.</p>
+        </div>
+
+        <div class="catalog-layout">
+          <aside class="filters-panel" aria-label="Filtros do catálogo">
+            <label for="search-products">Buscar</label>
+            <input id="search-products" type="search" placeholder="Nome, marca ou atributo">
+
+            <label for="category-filter">Categoria</label>
+            <select id="category-filter"></select>
+
+            <label for="availability-filter">Disponibilidade</label>
+            <select id="availability-filter">
+              <option value="todos">Todos</option>
+              <option value="disponivel">Disponível</option>
+              <option value="esgotado">Esgotado</option>
+            </select>
+
+            <label for="brand-filter">Marca</label>
+            <select id="brand-filter"></select>
+
+            <label for="sort-products">Ordenar</label>
+            <select id="sort-products">
+              <option value="relevancia">Relevância</option>
+              <option value="menor-preco">Menor preço</option>
+              <option value="maior-preco">Maior preço</option>
+              <option value="nome">Nome</option>
+            </select>
+          </aside>
+
+          <div>
+            <div class="catalog-toolbar">
+              <span id="catalog-count">Carregando catálogo</span>
+              <span id="catalog-source">Fonte Supabase</span>
+            </div>
+            <div class="category-tabs" id="category-tabs" aria-label="Categorias"></div>
+            <div class="product-grid" id="product-grid"></div>
+            <p class="empty-state hidden" id="empty-state">Nenhum produto encontrado com estes filtros.</p>
+            <div class="pagination-bar" id="pagination-bar" aria-label="Paginação do catálogo">
+              <button class="button secondary" type="button" id="previous-page">Anterior</button>
+              <span id="page-status">Página 1 de 1</span>
+              <button class="button secondary" type="button" id="next-page">Próxima</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="./core/app.js"></script>
+</body>
+</html>

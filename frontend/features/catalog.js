@@ -1,0 +1,185 @@
+import { CATALOG_SOURCE, CATEGORIES, getCatalogProducts } from "../config/products.js";
+import { createProductCard } from "../ui/productCard.js";
+import { normalizeText } from "../utils/format.js";
+
+const PAGE_SIZE = 8;
+
+function categoryLabel(categoryId) {
+  return CATEGORIES.find((category) => category.id === categoryId)?.label || categoryId;
+}
+
+function buildOptions(select) {
+  select.replaceChildren(...CATEGORIES.map((category) => {
+    const option = document.createElement("option");
+    option.value = category.id;
+    option.textContent = category.label;
+    return option;
+  }));
+}
+
+function buildBrandOptions(select, products) {
+  const brands = ["todos", ...new Set(products.map((product) => product.brand).sort())];
+  select.replaceChildren(...brands.map((brand) => {
+    const option = document.createElement("option");
+    option.value = brand;
+    option.textContent = brand === "todos" ? "Todas" : brand;
+    return option;
+  }));
+}
+
+function buildTabs(container, onSelect) {
+  container.replaceChildren(...CATEGORIES.map((category) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "category-tab";
+    button.dataset.category = category.id;
+    button.textContent = category.label;
+    return button;
+  }));
+
+  container.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-category]");
+    if (!button) return;
+    onSelect(button.dataset.category);
+  });
+}
+
+function filterProducts(products, { search, category, availability, brand }) {
+  const term = normalizeText(search);
+
+  return products.filter((product) => {
+    const matchesCategory = category === "todos" || product.category === category;
+    const matchesAvailability = availability === "todos" || product.availability === availability;
+    const matchesBrand = brand === "todos" || product.brand === brand;
+    const searchable = normalizeText([
+      product.name,
+      product.brand,
+      product.highlight,
+      product.description,
+      ...product.attributes.map((item) => `${item.label} ${item.value}`),
+    ].join(" "));
+
+    return matchesCategory && matchesAvailability && matchesBrand && searchable.includes(term);
+  });
+}
+
+function sortProducts(products, sortMode) {
+  const sorted = [...products];
+  if (sortMode === "menor-preco") {
+    sorted.sort((a, b) => a.price - b.price);
+  }
+  if (sortMode === "maior-preco") {
+    sorted.sort((a, b) => b.price - a.price);
+  }
+  if (sortMode === "nome") {
+    sorted.sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+  }
+  return sorted;
+}
+
+function paginateProducts(products, page) {
+  const totalPages = Math.max(1, Math.ceil(products.length / PAGE_SIZE));
+  const currentPage = Math.min(Math.max(page, 1), totalPages);
+  const start = (currentPage - 1) * PAGE_SIZE;
+  return {
+    currentPage,
+    totalPages,
+    items: products.slice(start, start + PAGE_SIZE),
+  };
+}
+
+export async function initCatalogPage() {
+  const grid = document.querySelector("#product-grid");
+  const empty = document.querySelector("#empty-state");
+  const search = document.querySelector("#search-products");
+  const category = document.querySelector("#category-filter");
+  const availability = document.querySelector("#availability-filter");
+  const brand = document.querySelector("#brand-filter");
+  const sort = document.querySelector("#sort-products");
+  const tabs = document.querySelector("#category-tabs");
+  const count = document.querySelector("#catalog-count");
+  const source = document.querySelector("#catalog-source");
+  const pageStatus = document.querySelector("#page-status");
+  const previousPage = document.querySelector("#previous-page");
+  const nextPage = document.querySelector("#next-page");
+
+  if (!grid || !category || !availability || !brand || !sort || !search || !tabs) return;
+
+  let currentPage = 1;
+  const products = await getCatalogProducts();
+
+  buildOptions(category);
+  buildBrandOptions(brand, products);
+  buildTabs(tabs, (categoryId) => {
+    category.value = categoryId;
+    currentPage = 1;
+    render();
+    document.querySelector("#catalogo")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+
+  function syncTabs() {
+    tabs.querySelectorAll(".category-tab").forEach((button) => {
+      button.classList.toggle("active", button.dataset.category === category.value);
+    });
+  }
+
+  function render() {
+    const filtered = sortProducts(filterProducts(products, {
+      search: search.value,
+      category: category.value,
+      availability: availability.value,
+      brand: brand.value,
+    }), sort.value);
+
+    const pagination = paginateProducts(filtered, currentPage);
+    currentPage = pagination.currentPage;
+    grid.classList.toggle("is-full-page", pagination.items.length === PAGE_SIZE);
+
+    grid.replaceChildren(...pagination.items.map((product) => (
+      createProductCard(product, categoryLabel(product.category))
+    )));
+
+    empty.classList.toggle("hidden", filtered.length > 0);
+    if (count) {
+      count.textContent = `${filtered.length} produto${filtered.length === 1 ? "" : "s"} encontrado${filtered.length === 1 ? "" : "s"}`;
+    }
+    if (source) {
+      source.textContent = CATALOG_SOURCE === "mock"
+        ? "Fonte mock preparada para Supabase"
+        : "Fonte Supabase";
+    }
+    if (pageStatus) {
+      pageStatus.textContent = `Página ${pagination.currentPage} de ${pagination.totalPages}`;
+    }
+    if (previousPage) {
+      previousPage.disabled = pagination.currentPage <= 1;
+    }
+    if (nextPage) {
+      nextPage.disabled = pagination.currentPage >= pagination.totalPages;
+    }
+    syncTabs();
+  }
+
+  [search, category, availability, brand, sort].forEach((element) => {
+    element.addEventListener("input", () => {
+      currentPage = 1;
+      render();
+    });
+    element.addEventListener("change", () => {
+      currentPage = 1;
+      render();
+    });
+  });
+
+  previousPage?.addEventListener("click", () => {
+    currentPage -= 1;
+    render();
+  });
+
+  nextPage?.addEventListener("click", () => {
+    currentPage += 1;
+    render();
+  });
+
+  render();
+}

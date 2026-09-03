@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Carrinho | IAGO Shopping</title>
+  <link rel="stylesheet" href="./css/style.css">
+</head>
+<body data-page="cart">
+  <div class="app-shell">
+    <header class="app-header">
+      <a class="brand-mark" href="./index.html" aria-label="IAGO Shopping">
+        <img src="./assets/logos/Logo_IAGO_completa_branca.png" alt="IAGO" class="brand-logo">
+        <span class="brand-divider"></span>
+        <span class="brand-product">Shopping</span>
+      </a>
+
+      <nav class="top-nav" aria-label="Navegação principal">
+        <a href="./catalogo.html">Catálogo</a>
+        <a href="./login.html">Entrada</a>
+        <a href="./admin.html">Admin</a>
+      </nav>
+    </header>
+
+    <main class="page-main">
+      <section class="section-head">
+        <div>
+          <span class="eyebrow">Carrinho</span>
+          <h1>Seu carrinho ativo</h1>
+        </div>
+        <p data-cart-summary>Carregando carrinho.</p>
+      </section>
+
+      <section class="cart-layout">
+        <div class="cart-list" data-cart-list></div>
+        <aside class="notice-panel cart-summary-panel">
+          <span class="card-kicker">Resumo</span>
+          <h2 data-cart-total>R$ 0,00</h2>
+          <p data-cart-count>0 itens no carrinho.</p>
+          <button class="button primary" type="button" data-cart-checkout disabled>Finalizar pedido</button>
+          <p class="extension-note" data-cart-checkout-note>Pagamento entra na próxima fase.</p>
+        </aside>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="./core/app.js"></script>
+</body>
+</html>

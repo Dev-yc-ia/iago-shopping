@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Admin | IAGO Shopping</title>
+  <link rel="stylesheet" href="./css/style.css">
+</head>
+<body data-page="admin">
+  <div class="app-shell">
+    <header class="app-header">
+      <a class="brand-mark" href="./index.html" aria-label="IAGO Shopping">
+        <img src="./assets/logos/Logo_IAGO_completa_branca.png" alt="IAGO" class="brand-logo">
+        <span class="brand-divider"></span>
+        <span class="brand-product">Shopping</span>
+      </a>
+
+      <nav class="top-nav" aria-label="Navegação principal">
+        <a href="./index.html">Entrada</a>
+        <a href="./catalogo.html">Catálogo</a>
+        <a href="./admin.html" aria-current="page">Admin</a>
+      </nav>
+    </header>
+
+    <main class="page-main">
+      <section class="section-head">
+        <div>
+          <span class="eyebrow">Admin</span>
+          <h1>Painel de permissões</h1>
+        </div>
+        <p>Perfil ativo: <span data-admin-role>Carregando</span></p>
+      </section>
+
+      <section class="admin-grid">
+        <article class="admin-card">
+          <span class="card-kicker">Master</span>
+          <h2>Governança</h2>
+          <p>Controle de ativação, papéis e escopos administrativos.</p>
+        </article>
+        <article class="admin-card">
+          <span class="card-kicker">Funcionário</span>
+          <h2>Operação</h2>
+          <p>Acesso administrativo ativo para operação assistida.</p>
+        </article>
+        <article class="admin-card">
+          <span class="card-kicker">Parceiro</span>
+          <h2>Catálogo</h2>
+          <p>Acesso administrativo preparado para fases comerciais futuras.</p>
+        </article>
+      </section>
+
+      <section class="section-head">
+        <div>
+          <span class="eyebrow">Produtos</span>
+          <h1>Cadastro</h1>
+        </div>
+        <p data-product-feedback>Carregando produtos.</p>
+      </section>
+
+      <section class="catalog-layout">
+        <form class="filters-panel product-form" data-product-form>
+          <input type="hidden" name="id">
+
+          <label for="product-sku">SKU</label>
+          <input id="product-sku" name="sku" type="text" placeholder="SHAPE-IAGO-825" required>
+
+          <label for="product-name">Nome</label>
+          <input id="product-name" name="nome" type="text" placeholder="Nome do produto" required>
+
+          <label for="product-brand">Marca</label>
+          <input id="product-brand" name="marca" type="text" placeholder="Marca" required>
+
+          <label for="product-category">Categoria</label>
+          <select id="product-category" name="categoria">
+            <option value="shapes">Shapes</option>
+            <option value="rodas">Rodas</option>
+            <option value="tenis">Tênis</option>
+            <option value="roupas-camisas">Roupas e camisas</option>
+            <option value="cameras-acessorios">Câmeras e acessórios</option>
+          </select>
+
+          <label for="product-price">Preço</label>
+          <input id="product-price" name="preco" type="number" min="0" step="0.01" placeholder="0.00" required>
+
+          <label for="product-stock">Estoque</label>
+          <input id="product-stock" name="quantidadeEstoque" type="number" min="0" step="1" inputmode="numeric" value="0" required>
+
+          <label for="product-status">Status</label>
+          <select id="product-status" name="status">
+            <option value="rascunho">Rascunho</option>
+            <option value="publicado">Publicado</option>
+            <option value="arquivado">Arquivado</option>
+          </select>
+
+          <label for="product-description">Descrição</label>
+          <textarea id="product-description" name="descricao" rows="4" placeholder="Descrição comercial"></textarea>
+
+          <label for="product-photos">Fotos do Produto</label>
+          <input id="product-photos" name="fotosProduto" type="file" accept="image/*" multiple>
+          <div data-product-image-preview></div>
+
+          <button class="button primary" type="submit">Salvar produto</button>
+          <button class="button ghost" type="button" data-product-reset>Limpar</button>
+        </form>
+
+        <div class="product-admin-column">
+          <article class="product-card product-live-preview" data-product-live-preview aria-live="polite">
+            <div data-preview-visual></div>
+            <div class="product-body">
+              <span class="card-kicker" data-preview-status>Rascunho</span>
+              <h3 data-preview-name>Nome do produto</h3>
+              <p data-preview-description>Descrição comercial</p>
+              <div class="product-meta">
+                <span data-preview-brand>Marca</span>
+                <strong data-preview-price>R$ 0,00</strong>
+              </div>
+              <div class="status-row">
+                <span data-preview-availability>Disponível</span>
+                <span data-preview-stock>0 unidades</span>
+              </div>
+              <span class="button secondary card-link" data-preview-category>Shapes</span>
+            </div>
+          </article>
+
+          <section class="admin-grid" data-products-list></section>
+        </div>
+      </section>
+
+      <section class="section-head">
+        <div>
+          <span class="eyebrow">Pedidos</span>
+          <h1>Recebidos</h1>
+        </div>
+        <p data-admin-orders-feedback>Carregando pedidos.</p>
+      </section>
+
+      <section class="admin-grid" data-admin-orders></section>
+
+      <section class="section-head">
+        <div>
+          <span class="eyebrow">Pagamentos</span>
+          <h1>Engine Mock</h1>
+        </div>
+        <p data-admin-payments-feedback>Carregando pagamentos.</p>
+      </section>
+
+      <section class="admin-grid" data-admin-payments></section>
+
+      <section class="section-head" data-master-only hidden>
+        <div>
+          <span class="eyebrow">Master</span>
+          <h1>Perfis</h1>
+        </div>
+        <p>Ativação e permissões de acesso.</p>
+      </section>
+
+      <section class="admin-grid" data-admin-profiles data-master-only hidden></section>
+    </main>
+  </div>
+
+  <script type="module" src="./core/app.js"></script>
+</body>
+</html>

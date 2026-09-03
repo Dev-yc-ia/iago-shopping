@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Checkout | IAGO Shopping</title>
+  <link rel="stylesheet" href="./css/style.css">
+</head>
+<body data-page="checkout">
+  <div class="app-shell">
+    <header class="app-header">
+      <a class="brand-mark" href="./index.html" aria-label="IAGO Shopping">
+        <img src="./assets/logos/Logo_IAGO_completa_branca.png" alt="IAGO" class="brand-logo">
+        <span class="brand-divider"></span>
+        <span class="brand-product">Shopping</span>
+      </a>
+
+      <nav class="top-nav" aria-label="Navegação principal">
+        <a href="./catalogo.html">Catálogo</a>
+        <a href="./login.html">Entrada</a>
+        <a href="./admin.html">Admin</a>
+      </nav>
+    </header>
+
+    <main class="page-main">
+      <section class="section-head">
+        <div>
+          <span class="eyebrow">Checkout</span>
+          <h1>Finalizar pagamento</h1>
+        </div>
+        <p data-checkout-summary>Carregando pedido.</p>
+      </section>
+
+      <section class="checkout-shell" data-checkout-root></section>
+    </main>
+  </div>
+
+  <script type="module" src="./core/app.js"></script>
+</body>
+</html>
