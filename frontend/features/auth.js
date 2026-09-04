@@ -2,6 +2,7 @@ import { APP_CONFIG } from "../config/app.js";
 import { recordEvent } from "../utils/analytics.js";
 
 let supabaseClientPromise;
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 
 function normalizeEmail(value) {
   return String(value || "").trim().toLowerCase();
@@ -11,21 +12,64 @@ function displayNameFromEmail(email) {
   return email.split("@")[0] || "Cliente IAGO";
 }
 
-async function loadPublicConfig() {
-  const response = await fetch(APP_CONFIG.publicConfigEndpoint, {
+function isLocalHttpHost() {
+  return LOCAL_HOSTS.has(window.location.hostname);
+}
+
+function publicConfigSources() {
+  const apiSource = APP_CONFIG.publicConfigEndpoint;
+  const staticSource = APP_CONFIG.publicConfigStaticPath;
+
+  return isLocalHttpHost()
+    ? [apiSource, staticSource]
+    : [staticSource, apiSource];
+}
+
+function pageRedirectUrl(pageName) {
+  return new URL(pageName, window.location.href).href;
+}
+
+async function fetchPublicConfig(source) {
+  const response = await fetch(source, {
     headers: { Accept: "application/json" },
+    cache: "no-store",
   });
 
   if (!response.ok) {
-    throw new Error("Não foi possível carregar a configuração pública do Supabase.");
+    throw new Error(`Configuração pública indisponível em ${source}.`);
   }
 
-  const config = await response.json();
+  return response.json();
+}
+
+async function loadPublicConfig() {
+  let lastError;
+
+  for (const source of publicConfigSources()) {
+    try {
+      const config = await fetchPublicConfig(source);
+      if (!config.supabase_configured) {
+        throw new Error("Supabase ainda não configurado na configuração pública.");
+      }
+
+      return config;
+    } catch (error) {
+      lastError = error;
+      console.warn(error.message);
+    }
+  }
+
+  if (lastError) {
+    console.warn(lastError.message);
+  }
+
+  throw new Error("Não foi possível carregar a configuração pública do Supabase.");
+}
+
+function assertPublicConfig(config) {
   if (!config.supabase_configured) {
-    throw new Error("Supabase ainda não configurado no .env local.");
+    throw new Error("Supabase ainda não configurado na configuração pública.");
   }
-
-  return config;
 }
 
 export async function getSupabaseClient() {
@@ -35,6 +79,7 @@ export async function getSupabaseClient() {
         import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm"),
         loadPublicConfig(),
       ]);
+      assertPublicConfig(config);
 
       return createClient(config.supabase_url, config.supabase_anon_key, {
         auth: {
@@ -145,7 +190,7 @@ export async function signInWithGoogle() {
   const { error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: window.location.origin + "/login.html",
+      redirectTo: pageRedirectUrl("login.html"),
     },
   });
 
@@ -168,7 +213,7 @@ export async function resetPasswordForEmail(email) {
 
   const supabase = await getSupabaseClient();
   const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
-    redirectTo: window.location.origin + "/nova-senha.html",
+    redirectTo: pageRedirectUrl("nova-senha.html"),
   });
   if (error) throw error;
 

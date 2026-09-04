@@ -5,6 +5,7 @@ export const APP_CONFIG = {
   anonymousSessionKey: "iago-shopping-anonymous-session",
   heroImagePath: "./assets/images/hero/tela_login.png",
   publicConfigEndpoint: "/api/config/public",
+  publicConfigStaticPath: new URL("./public.json", import.meta.url).href,
   paymentEngineEndpoint: "/api/payments/engine",
   paymentCreateEndpoint: "/api/payments/create",
   paymentSyncEndpoint: "/api/payments/sync",
