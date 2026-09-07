@@ -45,6 +45,10 @@ function toggleMenu(root) {
   openMenu(root);
 }
 
+function isTouchPointer(event) {
+  return event.pointerType === "touch" || event.pointerType === "pen";
+}
+
 export function mountUserMenu(nav, { profile, session, avatarUrl, onSignOut }) {
   unmountUserMenu();
 
@@ -96,15 +100,39 @@ export function mountUserMenu(nav, { profile, session, avatarUrl, onSignOut }) {
   profileLink.href = "/dados-pessoais/";
   profileLink.role = "menuitem";
   profileLink.textContent = "Dados pessoais";
+  profileLink.addEventListener("pointerup", (event) => {
+    if (!isTouchPointer(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    window.location.href = profileLink.href;
+  });
 
   const logoutButton = document.createElement("button");
   logoutButton.className = "user-menu-item";
   logoutButton.type = "button";
   logoutButton.role = "menuitem";
   logoutButton.textContent = "Sair";
-  logoutButton.addEventListener("click", async () => {
-    await onSignOut();
+
+  let isSigningOut = false;
+  const handleSignOut = async () => {
+    if (isSigningOut) return;
+    isSigningOut = true;
+    logoutButton.disabled = true;
+    try {
+      await onSignOut();
+    } catch (error) {
+      isSigningOut = false;
+      logoutButton.disabled = false;
+      console.warn(error.message);
+    }
+  };
+  logoutButton.addEventListener("pointerup", (event) => {
+    if (!isTouchPointer(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    handleSignOut();
   });
+  logoutButton.addEventListener("click", handleSignOut);
 
   dropdown.append(profileLink, logoutButton);
   root.append(button, dropdown);
@@ -119,8 +147,10 @@ export function mountUserMenu(nav, { profile, session, avatarUrl, onSignOut }) {
       closeMenu(root, true);
     }
   };
-  const onFocusout = (event) => {
-    if (!root.contains(event.relatedTarget)) closeMenu(root);
+  const onFocusout = () => {
+    window.setTimeout(() => {
+      if (!root.contains(document.activeElement)) closeMenu(root);
+    }, 0);
   };
 
   button.addEventListener("click", onButtonClick);
