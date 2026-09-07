@@ -10,13 +10,12 @@ const ORDER_STATUS_LABELS = {
 };
 
 function currentRelativeUrl() {
-  const page = window.location.pathname.split("/").pop() || "pedidos.html";
-  return `./${page}${window.location.search}`;
+  return `/pedidos/${window.location.search}`;
 }
 
 function redirectToOrdersLogin() {
   const redirect = encodeURIComponent(currentRelativeUrl());
-  window.location.href = `./login.html?aviso=pedidos&redirect=${redirect}`;
+  window.location.href = `/login/?aviso=pedidos&redirect=${redirect}`;
 }
 
 async function getAuthenticatedOrdersClient() {
@@ -211,7 +210,7 @@ function renderOrderCard(order, highlightedId) {
   const paymentSummary = renderPaymentSummary(order);
   const checkoutLink = document.createElement("a");
   checkoutLink.className = "button primary";
-  checkoutLink.href = `./checkout.html?pedido=${encodeURIComponent(order.id)}`;
+  checkoutLink.href = `/checkout/?pedido=${encodeURIComponent(order.id)}`;
   checkoutLink.textContent = order.paymentStatus === "aprovado" ? "Ver checkout" : "Continuar pagamento";
 
   card.append(header, itemList, paymentSummary, checkoutLink);

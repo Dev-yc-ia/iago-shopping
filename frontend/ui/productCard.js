@@ -39,7 +39,7 @@ export function createProductCard(product, categoryLabel) {
 
   const detailLink = document.createElement("a");
   detailLink.className = "card-link";
-  detailLink.href = `./produto.html?id=${encodeURIComponent(product.id)}`;
+  detailLink.href = `/produto/?id=${encodeURIComponent(product.id)}`;
   detailLink.textContent = "Ver produto";
 
   meta.append(price, availability);

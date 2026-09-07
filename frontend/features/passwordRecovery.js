@@ -96,7 +96,7 @@ export async function initPasswordUpdatePage() {
       await updatePassword(password);
       setMessage(message, "Senha alterada com sucesso. Redirecionando para o login.");
       window.setTimeout(() => {
-        window.location.href = "./login.html";
+        window.location.href = "/login/";
       }, 1800);
     } catch {
       setMessage(message, "Não foi possível alterar a senha. Solicite um novo link e tente novamente.");

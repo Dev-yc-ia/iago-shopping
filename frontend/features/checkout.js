@@ -14,12 +14,12 @@ import {
 } from "./payments.js";
 
 function currentRelativeUrl() {
-  return `./checkout.html${window.location.search}`;
+  return `/checkout/${window.location.search}`;
 }
 
 function redirectToCheckoutLogin() {
   const redirect = encodeURIComponent(currentRelativeUrl());
-  window.location.href = `./login.html?aviso=pedidos&redirect=${redirect}`;
+  window.location.href = `/login/?aviso=pedidos&redirect=${redirect}`;
 }
 
 async function getAuthenticatedCheckoutClient() {
@@ -413,11 +413,11 @@ function renderCheckout(root, summary, order, paymentEngine, selectedMethod, han
   links.className = "checkout-actions";
   const ordersLink = document.createElement("a");
   ordersLink.className = "button";
-  ordersLink.href = "./pedidos.html";
+  ordersLink.href = "/pedidos/";
   ordersLink.textContent = "Ver pedidos";
   const cartLink = document.createElement("a");
   cartLink.className = "button";
-  cartLink.href = "./carrinho.html";
+  cartLink.href = "/carrinho/";
   cartLink.textContent = "Voltar ao carrinho";
   links.append(ordersLink, cartLink);
   panel.append(links);

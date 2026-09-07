@@ -31,7 +31,7 @@ Para verificar:
 testar.bat
 ```
 
-O frontend também pode ser aberto diretamente por `frontend/index.html`, pois usa caminhos relativos. A página inicial é a entrada; o catálogo público fica em `frontend/catalogo.html`.
+Com o backend local iniciado, a página inicial fica em `/` e o catálogo público fica em `/catalogo/`. Para publicação no GitHub Pages, o conteúdo de `frontend/` deve ser publicado como raiz do site.
 
 ## Estrutura
 
@@ -137,4 +137,4 @@ O primeiro master deve ser definido somente via SQL Editor depois que o usuário
 - health em `http://127.0.0.1:8010/health`
 - health alternativo em `http://127.0.0.1:8010/api/health`
 - documentação em `http://127.0.0.1:8010/docs`
-- catálogo público em `http://127.0.0.1:8010/catalogo.html`
+- catálogo público em `http://127.0.0.1:8010/catalogo/`

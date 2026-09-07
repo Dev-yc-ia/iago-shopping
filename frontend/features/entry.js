@@ -10,7 +10,7 @@ export function initEntryPage() {
 
     try {
       await signInWithPassword(access, password);
-      window.location.href = "./catalogo.html";
+      window.location.href = "/catalogo/";
     } catch (error) {
       window.alert(error.message);
     }

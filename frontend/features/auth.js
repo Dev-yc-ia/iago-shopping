@@ -21,49 +21,97 @@ function publicConfigSources() {
   const staticSource = APP_CONFIG.publicConfigStaticPath;
 
   return isLocalHttpHost()
-    ? [apiSource, staticSource]
-    : [staticSource, apiSource];
+    ? [
+        { label: "backend local", url: apiSource },
+        { label: "JSON público", url: staticSource },
+      ]
+    : [
+        { label: "JSON público", url: staticSource },
+        { label: "backend/API", url: apiSource },
+      ];
 }
 
 function pageRedirectUrl(pageName) {
   return new URL(pageName, window.location.href).href;
 }
 
+function compactText(value) {
+  return String(value || "").replace(/\s+/g, " ").trim().slice(0, 160);
+}
+
+function describePublicConfig(config) {
+  const missing = [];
+  if (!config || typeof config !== "object") missing.push("JSON inválido");
+  if (!config?.supabase_url) missing.push("supabase_url");
+  if (!config?.supabase_anon_key) missing.push("supabase_anon_key");
+  if (!config?.supabase_configured) missing.push("supabase_configured=true");
+  return missing;
+}
+
+function buildPublicConfigError(attempts) {
+  const environment = isLocalHttpHost() ? "local" : "publicado/GitHub Pages";
+  const details = attempts
+    .map((attempt) => `- ${attempt.label}: ${attempt.url} -> ${attempt.reason}`)
+    .join("\n");
+
+  return [
+    "Não foi possível carregar a configuração pública do Supabase.",
+    "",
+    `Ambiente detectado: ${environment}`,
+    `Página atual: ${window.location.href}`,
+    "",
+    "Tentativas:",
+    details,
+  ].join("\n");
+}
+
 async function fetchPublicConfig(source) {
-  const response = await fetch(source, {
+  const response = await fetch(source.url, {
     headers: { Accept: "application/json" },
     cache: "no-store",
   });
 
+  const body = await response.text();
   if (!response.ok) {
-    throw new Error(`Configuração pública indisponível em ${source}.`);
+    const preview = compactText(body);
+    throw new Error(
+      `HTTP ${response.status} ${response.statusText || ""}${
+        preview ? ` | resposta: ${preview}` : ""
+      }`
+    );
   }
 
-  return response.json();
+  try {
+    return JSON.parse(body);
+  } catch (error) {
+    throw new Error(`JSON inválido ou vazio | resposta: ${compactText(body)}`);
+  }
 }
 
 async function loadPublicConfig() {
-  let lastError;
+  const attempts = [];
 
   for (const source of publicConfigSources()) {
     try {
       const config = await fetchPublicConfig(source);
-      if (!config.supabase_configured) {
-        throw new Error("Supabase ainda não configurado na configuração pública.");
+      const missing = describePublicConfig(config);
+      if (missing.length) {
+        throw new Error(`campos ausentes ou inválidos: ${missing.join(", ")}`);
       }
 
+      console.info(`Configuração pública do Supabase carregada via ${source.label}.`);
       return config;
     } catch (error) {
-      lastError = error;
-      console.warn(error.message);
+      attempts.push({
+        label: source.label,
+        url: source.url,
+        reason: error.message,
+      });
+      console.warn(`Falha ao carregar configuração pública via ${source.label}: ${error.message}`);
     }
   }
 
-  if (lastError) {
-    console.warn(lastError.message);
-  }
-
-  throw new Error("Não foi possível carregar a configuração pública do Supabase.");
+  throw new Error(buildPublicConfigError(attempts));
 }
 
 function assertPublicConfig(config) {
@@ -190,7 +238,7 @@ export async function signInWithGoogle() {
   const { error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: pageRedirectUrl("login.html"),
+      redirectTo: pageRedirectUrl("/login/"),
     },
   });
 
@@ -213,7 +261,7 @@ export async function resetPasswordForEmail(email) {
 
   const supabase = await getSupabaseClient();
   const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
-    redirectTo: pageRedirectUrl("nova-senha.html"),
+    redirectTo: pageRedirectUrl("/nova-senha/"),
   });
   if (error) throw error;
 
@@ -260,7 +308,7 @@ export function canAccessAdmin(profile) {
 export async function requireAdminAccess() {
   const authState = await recoverSessionProfile();
   if (!canAccessAdmin(authState.profile)) {
-    window.location.href = "./login.html";
+    window.location.href = "/login/";
     return null;
   }
 
@@ -271,7 +319,7 @@ export async function initAuthNavigation() {
   const nav = document.querySelector(".top-nav");
   if (!nav) return;
 
-  const adminLink = nav.querySelector('a[href$="admin.html"]');
+  const adminLink = nav.querySelector('a[href$="/admin/"]');
   if (adminLink) {
     adminLink.hidden = true;
   }
@@ -284,13 +332,13 @@ export async function initAuthNavigation() {
     if (!session) return;
 
     const ordersLink = document.createElement("a");
-    ordersLink.href = "./pedidos.html";
+    ordersLink.href = "/pedidos/";
     ordersLink.textContent = "Pedidos";
     ordersLink.dataset.ordersLink = "true";
     nav.append(ordersLink);
 
     const cartLink = document.createElement("a");
-    cartLink.href = "./carrinho.html";
+    cartLink.href = "/carrinho/";
     cartLink.textContent = "Carrinho";
     cartLink.dataset.cartLink = "true";
     nav.append(cartLink);
@@ -301,7 +349,7 @@ export async function initAuthNavigation() {
     logoutButton.textContent = "Sair";
     logoutButton.addEventListener("click", async () => {
       await signOut();
-      window.location.href = "./index.html";
+      window.location.href = "/";
     });
     nav.append(logoutButton);
   } catch (error) {

@@ -5,8 +5,8 @@ let authMode = "login";
 
 function safeRedirectTarget() {
   const target = new URLSearchParams(window.location.search).get("redirect");
-  if (!target || !target.startsWith("./") || target.includes("//")) {
-    return "./catalogo.html";
+  if (!target || !target.startsWith("/") || target.startsWith("//") || /^[a-z][a-z0-9+.-]*:/i.test(target)) {
+    return "/catalogo/";
   }
   return target;
 }

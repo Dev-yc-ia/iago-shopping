@@ -3,7 +3,7 @@ export const APP_CONFIG = {
   phase: "2",
   analyticsStorageKey: "iago-shopping-anonymous-events",
   anonymousSessionKey: "iago-shopping-anonymous-session",
-  heroImagePath: "./assets/images/hero/tela_login.png",
+  heroImagePath: "/assets/images/hero/tela_login.png",
   publicConfigEndpoint: "/api/config/public",
   publicConfigStaticPath: new URL("./public.json", import.meta.url).href,
   paymentEngineEndpoint: "/api/payments/engine",

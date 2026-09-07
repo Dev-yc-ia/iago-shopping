@@ -4,14 +4,13 @@ import { recordEvent } from "../utils/analytics.js";
 import { formatCurrency } from "../utils/format.js";
 
 function currentRelativeUrl() {
-  const page = window.location.pathname.split("/").pop() || "index.html";
-  return `./${page}${window.location.search}`;
+  return `/carrinho/${window.location.search}`;
 }
 
 function redirectToCartLogin() {
   recordEvent("cart_login_required", { source: document.body.dataset.page || "unknown" });
   const redirect = encodeURIComponent(currentRelativeUrl());
-  window.location.href = `./login.html?aviso=carrinho&redirect=${redirect}`;
+  window.location.href = `/login/?aviso=carrinho&redirect=${redirect}`;
 }
 
 async function getAuthenticatedCartClient() {
@@ -233,7 +232,7 @@ export async function initCartPage() {
     try {
       const order = await finalizeCartOrder();
       if (order?.id) {
-        window.location.href = `./checkout.html?pedido=${encodeURIComponent(order.id)}`;
+        window.location.href = `/checkout/?pedido=${encodeURIComponent(order.id)}`;
         return;
       }
       await refreshCart();

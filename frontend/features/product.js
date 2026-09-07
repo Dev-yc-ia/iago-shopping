@@ -185,7 +185,7 @@ function renderProductDetail(container, product) {
   cartButton.addEventListener("click", async () => {
     try {
       const added = await addProductToCart(product.id, 1);
-      if (added) window.location.href = "./carrinho.html";
+      if (added) window.location.href = "/carrinho/";
     } catch (error) {
       window.alert(error.message);
     }

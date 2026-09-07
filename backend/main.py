@@ -48,27 +48,25 @@ def create_app() -> FastAPI:
             if static_dir.exists():
                 app.mount(f"/{folder}", StaticFiles(directory=static_dir), name=f"frontend-{folder}")
 
+        frontend_routes = {
+            "catalogo": FRONTEND_DIR / "catalogo" / "index.html",
+            "produto": FRONTEND_DIR / "produto" / "index.html",
+            "carrinho": FRONTEND_DIR / "carrinho" / "index.html",
+            "checkout": FRONTEND_DIR / "checkout" / "index.html",
+            "pedidos": FRONTEND_DIR / "pedidos" / "index.html",
+            "login": FRONTEND_DIR / "login" / "index.html",
+            "admin": FRONTEND_DIR / "admin" / "index.html",
+            "recuperar-senha": FRONTEND_DIR / "recuperar-senha" / "index.html",
+            "nova-senha": FRONTEND_DIR / "nova-senha" / "index.html",
+        }
+
         @app.get("/", include_in_schema=False)
         def frontend_index() -> FileResponse:
             return FileResponse(FRONTEND_DIR / "index.html")
 
-        @app.get("/{page_name}.html", include_in_schema=False)
-        def frontend_page(page_name: str) -> FileResponse:
-            allowed_pages = {
-                "index",
-                "catalogo",
-                "produto",
-                "carrinho",
-                "checkout",
-                "pedidos",
-                "login",
-                "admin",
-                "recuperar-senha",
-                "nova-senha",
-            }
-            if page_name not in allowed_pages:
-                return FileResponse(FRONTEND_DIR / "index.html")
-            return FileResponse(FRONTEND_DIR / f"{page_name}.html")
+        @app.get("/{page_name}/", include_in_schema=False)
+        def frontend_clean_page(page_name: str) -> FileResponse:
+            return FileResponse(frontend_routes.get(page_name, FRONTEND_DIR / "index.html"))
 
     return app
 
