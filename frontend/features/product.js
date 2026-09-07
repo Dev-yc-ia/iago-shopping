@@ -150,6 +150,7 @@ function renderProductDetail(container, product) {
   title.textContent = product.name;
 
   const description = document.createElement("p");
+  description.className = "product-description";
   description.textContent = product.description;
 
   const price = document.createElement("div");

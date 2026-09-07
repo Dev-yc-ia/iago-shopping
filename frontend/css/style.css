@@ -765,6 +765,18 @@ textarea {
   font-weight: 900;
 }
 
+.product-description,
+.product-description-preview {
+  white-space: pre-line;
+}
+
+.product-description-preview {
+  display: block;
+  overflow: visible;
+  -webkit-line-clamp: unset;
+  -webkit-box-orient: unset;
+}
+
 .card-link {
   width: 100%;
   margin-top: auto;
