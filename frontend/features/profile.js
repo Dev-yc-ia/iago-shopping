@@ -1,4 +1,8 @@
-import { getSupabaseClient } from "./auth.js";
+import {
+  getSupabaseClient,
+  googleAvatarUrlFromSession,
+  googleDisplayNameFromSession,
+} from "./auth.js";
 
 const AVATAR_BUCKET = "shopping-avatars";
 const MAX_AVATAR_SIZE_BYTES = 5 * 1024 * 1024;
@@ -57,6 +61,7 @@ function validateAvatar(file) {
 function profileInitial(profile, session) {
   const source = profile?.nome_completo
     || profile?.nome_exibicao
+    || googleDisplayNameFromSession(session)
     || session?.user?.email
     || "";
   return String(source).trim().charAt(0).toUpperCase() || "I";
@@ -67,6 +72,14 @@ function renderAvatarFallback(container, profile, session) {
   fallback.className = "profile-avatar-fallback";
   fallback.textContent = profileInitial(profile, session);
   container.replaceChildren(fallback);
+}
+
+function renderExternalAvatar(container, profile, session, url) {
+  const image = document.createElement("img");
+  image.src = url;
+  image.alt = "Foto de perfil";
+  image.addEventListener("error", () => renderAvatarFallback(container, profile, session), { once: true });
+  container.replaceChildren(image);
 }
 
 async function getAuthenticatedContext() {
@@ -158,6 +171,11 @@ async function renderCurrentAvatar(supabase, container, profile, session) {
   }
 
   if (!profile?.avatar_path || pendingAvatarRemoval) {
+    const googleAvatarUrl = googleAvatarUrlFromSession(session);
+    if (googleAvatarUrl) {
+      renderExternalAvatar(container, profile, session, googleAvatarUrl);
+      return;
+    }
     renderAvatarFallback(container, profile, session);
     return;
   }

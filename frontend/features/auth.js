@@ -5,6 +5,8 @@ import { recordEvent } from "../utils/analytics.js";
 let supabaseClientPromise;
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 const AVATAR_BUCKET = "shopping-avatars";
+const GOOGLE_METADATA_AVATAR_KEYS = ["avatar_url", "picture"];
+const GOOGLE_METADATA_NAME_KEYS = ["full_name", "name", "nome_exibicao"];
 
 function normalizeEmail(value) {
   return String(value || "").trim().toLowerCase();
@@ -12,6 +14,46 @@ function normalizeEmail(value) {
 
 function displayNameFromEmail(email) {
   return email.split("@")[0] || "Cliente IAGO";
+}
+
+function firstMetadataText(metadata, keys) {
+  for (const key of keys) {
+    const value = String(metadata?.[key] || "").trim();
+    if (value) return value;
+  }
+  return "";
+}
+
+function sessionProvider(session) {
+  const user = session?.user;
+  const appProvider = String(user?.app_metadata?.provider || "").toLowerCase();
+  if (appProvider) return appProvider;
+
+  const identityProvider = user?.identities
+    ?.map((identity) => String(identity?.provider || "").toLowerCase())
+    ?.find(Boolean);
+  return identityProvider || "";
+}
+
+function isGoogleSession(session) {
+  return sessionProvider(session) === "google"
+    || Boolean(session?.user?.identities?.some((identity) => identity?.provider === "google"));
+}
+
+export function googleDisplayNameFromSession(session) {
+  return firstMetadataText(session?.user?.user_metadata, GOOGLE_METADATA_NAME_KEYS);
+}
+
+export function googleAvatarUrlFromSession(session) {
+  const url = firstMetadataText(session?.user?.user_metadata, GOOGLE_METADATA_AVATAR_KEYS);
+  if (!url) return "";
+
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "https:" ? parsed.href : "";
+  } catch {
+    return "";
+  }
 }
 
 function isLocalHttpHost() {
@@ -165,6 +207,25 @@ async function getOwnProfile(supabase) {
   return data?.[0] || null;
 }
 
+async function syncGoogleProfileIfNeeded(supabase, session, profile) {
+  if (!session?.user || !isGoogleSession(session)) return profile;
+
+  const googleName = googleDisplayNameFromSession(session);
+  const sessionEmail = normalizeEmail(session.user.email);
+  const needsName = googleName && (!profile?.nome_completo || !profile?.nome_exibicao);
+  const needsEmail = sessionEmail && profile?.email_normalizado !== sessionEmail;
+
+  if (!needsName && !needsEmail) return profile;
+
+  const { data, error } = await supabase.rpc("shopping_perfil_oauth_sincronizar", {
+    p_nome_google: googleName || null,
+    p_email_normalizado: sessionEmail || null,
+  });
+
+  if (error) throw error;
+  return data?.[0] || profile;
+}
+
 export async function listAdminProfiles() {
   const supabase = await getSupabaseClient();
   const { data, error } = await supabase.rpc("shopping_admin_listar_perfis");
@@ -296,7 +357,7 @@ export async function recoverSessionProfile() {
   if (!session?.user) return { session: null, profile: null };
 
   const supabase = await getSupabaseClient();
-  const profile = await getOwnProfile(supabase);
+  const profile = await syncGoogleProfileIfNeeded(supabase, session, await getOwnProfile(supabase));
   return { session, profile };
 }
 
@@ -320,6 +381,11 @@ async function resolveAvatarUrl(supabase, avatarPath) {
   }
 
   return data?.signedUrl || "";
+}
+
+async function resolveUserAvatarUrl(supabase, profile, session) {
+  const storedAvatarUrl = await resolveAvatarUrl(supabase, profile?.avatar_path);
+  return storedAvatarUrl || googleAvatarUrlFromSession(session);
 }
 
 function normalizeLoginLinks(nav) {
@@ -395,7 +461,7 @@ export async function initAuthNavigation() {
     appendAuthenticatedLink(nav, "/carrinho/", "Carrinho", "cartLink");
 
     const supabase = await getSupabaseClient();
-    const avatarUrl = await resolveAvatarUrl(supabase, profile?.avatar_path);
+    const avatarUrl = await resolveUserAvatarUrl(supabase, profile, session);
     mountUserMenu(nav, {
       profile,
       session,

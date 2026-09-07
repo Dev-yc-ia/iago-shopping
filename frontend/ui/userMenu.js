@@ -1,4 +1,5 @@
 let cleanupCurrentMenu = null;
+const GOOGLE_METADATA_NAME_KEYS = ["full_name", "name", "nome_exibicao"];
 
 export function unmountUserMenu() {
   if (!cleanupCurrentMenu) return;
@@ -7,8 +8,13 @@ export function unmountUserMenu() {
 }
 
 function profileInitial(profile, session) {
+  const metadata = session?.user?.user_metadata;
+  const googleName = GOOGLE_METADATA_NAME_KEYS
+    .map((key) => String(metadata?.[key] || "").trim())
+    .find(Boolean);
   const source = profile?.nome_completo
     || profile?.nome_exibicao
+    || googleName
     || session?.user?.email
     || "";
   return String(source).trim().charAt(0).toUpperCase() || "I";

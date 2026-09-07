@@ -1,5 +1,5 @@
 import { recordEvent } from "../utils/analytics.js";
-import { getCurrentSession, signInWithGoogle, signInWithPassword, signUpCliente } from "./auth.js";
+import { recoverSessionProfile, signInWithGoogle, signInWithPassword, signUpCliente } from "./auth.js";
 
 let authMode = "login";
 
@@ -37,8 +37,8 @@ function setAuthMode(mode) {
 export function initLoginPage() {
   showLoginNotice();
 
-  getCurrentSession()
-    .then((session) => {
+  recoverSessionProfile()
+    .then(({ session }) => {
       if (session?.user) window.location.href = safeRedirectTarget();
     })
     .catch((error) => console.warn(error.message));
@@ -70,11 +70,17 @@ export function initLoginPage() {
     recordEvent("continue_without_login", { source: "login_page" });
   });
 
-  document.querySelector("#google-login-button")?.addEventListener("click", async () => {
+  document.querySelector("#google-login-button")?.addEventListener("click", async (event) => {
+    const button = event.currentTarget;
+    const originalLabel = button.textContent;
+    button.disabled = true;
+    button.textContent = "Abrindo Google...";
     recordEvent("login_start", { source: "google_visual_login" });
     try {
       await signInWithGoogle(`${window.location.pathname}${window.location.search}`);
     } catch (error) {
+      button.disabled = false;
+      button.textContent = originalLabel;
       window.alert(error.message);
     }
   });
