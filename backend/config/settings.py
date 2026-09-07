@@ -8,6 +8,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 ENV_FILE = BASE_DIR / ".env"
+PRODUCTION_CORS_ORIGINS = ["https://ia-go.api.br", "https://www.ia-go.api.br"]
 
 
 class Settings(BaseSettings):
@@ -29,6 +30,16 @@ class Settings(BaseSettings):
     mercado_pago_notification_url: str = ""
     mercado_pago_payment_expiration_minutes: int = 30
     mercado_pago_poll_interval_ms: int = 3000
+
+    @property
+    def is_production(self) -> bool:
+        return self.environment.strip().lower() in {"production", "prod"}
+
+    @property
+    def resolved_cors_origins(self) -> List[str]:
+        if self.is_production and ("*" in self.cors_origins or not self.cors_origins):
+            return PRODUCTION_CORS_ORIGINS
+        return self.cors_origins
 
     @property
     def supabase_configured(self) -> bool:
@@ -63,6 +74,8 @@ def safe_settings_diagnostics(settings: Settings | None = None) -> dict[str, str
         "MERCADO_PAGO_MODE": "PRODUCAO" if payment_provider == "mercado_pago_prod" else "SANDBOX",
         "MERCADO_PAGO_ACCESS_TOKEN": status(current.mercado_pago_access_token),
         "MERCADO_PAGO_PUBLIC_KEY": status(current.mercado_pago_public_key),
+        "MERCADO_PAGO_WEBHOOK_SECRET": status(current.mercado_pago_webhook_secret),
+        "MERCADO_PAGO_NOTIFICATION_URL": status(current.mercado_pago_notification_url),
         "SUPABASE_URL": status(current.supabase_url),
         "SUPABASE_SERVICE_ROLE_KEY": status(current.supabase_service_role_key),
     }
