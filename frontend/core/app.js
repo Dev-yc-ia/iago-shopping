@@ -8,6 +8,7 @@ import { initLoginPage } from "../features/login.js";
 import { initOrdersPage } from "../features/orders.js";
 import { initPasswordRecoveryPage, initPasswordUpdatePage } from "../features/passwordRecovery.js";
 import { initProductPage } from "../features/product.js";
+import { initProfilePage } from "../features/profile.js";
 import { recordEvent } from "../utils/analytics.js";
 
 function trackGlobalActions() {
@@ -32,6 +33,7 @@ function boot() {
   if (page === "orders") initOrdersPage();
   if (page === "login") initLoginPage();
   if (page === "admin") initAdminPage();
+  if (page === "profile") initProfilePage();
   if (page === "password-recovery") initPasswordRecoveryPage();
   if (page === "password-update") initPasswordUpdatePage();
 }

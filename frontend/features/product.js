@@ -14,7 +14,14 @@ function getCategoryLabel(categoryId) {
 
 function productImages(product) {
   const images = Array.isArray(product.images) ? product.images.filter((image) => image.url) : [];
-  if (images.length) return images;
+  if (images.length) {
+    return [...images].sort((left, right) => {
+      if (Boolean(left.principal) !== Boolean(right.principal)) {
+        return left.principal ? -1 : 1;
+      }
+      return Number(left.ordem || 0) - Number(right.ordem || 0);
+    });
+  }
   if (product.imageUrl) {
     return [{
       url: product.imageUrl,

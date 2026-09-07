@@ -13,6 +13,8 @@ import {
   syncMercadoPagoPayment,
 } from "./payments.js";
 
+const VALID_PAYMENT_METHODS = new Set(Object.keys(PAYMENT_METHOD_LABELS));
+
 function currentRelativeUrl() {
   return `/checkout/${window.location.search}`;
 }
@@ -33,6 +35,24 @@ async function getAuthenticatedCheckoutClient() {
   }
 
   return supabase;
+}
+
+async function loadPreferredPaymentMethod() {
+  try {
+    const supabase = await getSupabaseClient();
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError) throw sessionError;
+    if (!sessionData.session?.user) return "pix";
+
+    const { data, error } = await supabase.rpc("shopping_perfil_atual");
+    if (error) throw error;
+
+    const preferredMethod = data?.[0]?.pagamento_preferido;
+    return VALID_PAYMENT_METHODS.has(preferredMethod) ? preferredMethod : "pix";
+  } catch (error) {
+    console.warn(`Não foi possível carregar a preferência de pagamento: ${error.message}`);
+    return "pix";
+  }
 }
 
 function normalizeOrder(order) {
@@ -435,7 +455,7 @@ export async function initCheckoutPage() {
   const summary = document.querySelector("[data-checkout-summary]");
   if (!root) return;
 
-  let selectedMethod = "pix";
+  let selectedMethod = await loadPreferredPaymentMethod();
   let paymentEngine = null;
   let currentOrder = null;
   let processing = false;

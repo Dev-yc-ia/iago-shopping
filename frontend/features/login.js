@@ -1,5 +1,5 @@
 import { recordEvent } from "../utils/analytics.js";
-import { signInWithGoogle, signInWithPassword, signUpCliente } from "./auth.js";
+import { getCurrentSession, signInWithGoogle, signInWithPassword, signUpCliente } from "./auth.js";
 
 let authMode = "login";
 
@@ -37,6 +37,12 @@ function setAuthMode(mode) {
 export function initLoginPage() {
   showLoginNotice();
 
+  getCurrentSession()
+    .then((session) => {
+      if (session?.user) window.location.href = safeRedirectTarget();
+    })
+    .catch((error) => console.warn(error.message));
+
   if (window.location.hash === "#create-account") {
     setAuthMode("signup");
   }
@@ -67,7 +73,7 @@ export function initLoginPage() {
   document.querySelector("#google-login-button")?.addEventListener("click", async () => {
     recordEvent("login_start", { source: "google_visual_login" });
     try {
-      await signInWithGoogle();
+      await signInWithGoogle(`${window.location.pathname}${window.location.search}`);
     } catch (error) {
       window.alert(error.message);
     }

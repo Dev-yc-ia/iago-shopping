@@ -1,8 +1,10 @@
 import { APP_CONFIG } from "../config/app.js";
+import { mountUserMenu, unmountUserMenu } from "../ui/userMenu.js";
 import { recordEvent } from "../utils/analytics.js";
 
 let supabaseClientPromise;
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
+const AVATAR_BUCKET = "shopping-avatars";
 
 function normalizeEmail(value) {
   return String(value || "").trim().toLowerCase();
@@ -233,12 +235,12 @@ export async function signUpCliente(access, password) {
   return data;
 }
 
-export async function signInWithGoogle() {
+export async function signInWithGoogle(redirectPath = "/login/") {
   const supabase = await getSupabaseClient();
   const { error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: pageRedirectUrl("/login/"),
+      redirectTo: pageRedirectUrl(redirectPath),
     },
   });
 
@@ -305,6 +307,52 @@ export function canAccessAdmin(profile) {
   );
 }
 
+async function resolveAvatarUrl(supabase, avatarPath) {
+  if (!avatarPath) return "";
+
+  const { data, error } = await supabase.storage
+    .from(AVATAR_BUCKET)
+    .createSignedUrl(avatarPath, 60 * 60);
+
+  if (error) {
+    console.warn(error.message);
+    return "";
+  }
+
+  return data?.signedUrl || "";
+}
+
+function normalizeLoginLinks(nav) {
+  const links = Array.from(nav.querySelectorAll("a"));
+  return links.filter((link) => {
+    const href = link.getAttribute("href");
+    const text = link.textContent.trim().toLowerCase();
+    const isLoginHref = href === "/login/";
+    const isLegacyEntryHref = href === "/" && (text === "entrada" || text === "login");
+    if (isLoginHref || isLegacyEntryHref) {
+      link.href = "/login/";
+      link.textContent = "Login";
+      return true;
+    }
+    return false;
+  });
+}
+
+function resetDynamicNavigation(nav) {
+  unmountUserMenu();
+  nav.querySelectorAll("[data-auth-dynamic]").forEach((element) => element.remove());
+  nav.querySelector("[data-user-menu-root]")?.remove();
+}
+
+function appendAuthenticatedLink(nav, href, label, datasetKey) {
+  const link = document.createElement("a");
+  link.href = href;
+  link.textContent = label;
+  link.dataset.authDynamic = "true";
+  link.dataset[datasetKey] = "true";
+  nav.append(link);
+}
+
 export async function requireAdminAccess() {
   const authState = await recoverSessionProfile();
   if (!canAccessAdmin(authState.profile)) {
@@ -319,6 +367,8 @@ export async function initAuthNavigation() {
   const nav = document.querySelector(".top-nav");
   if (!nav) return;
 
+  resetDynamicNavigation(nav);
+  const loginLinks = normalizeLoginLinks(nav);
   const adminLink = nav.querySelector('a[href$="/admin/"]');
   if (adminLink) {
     adminLink.hidden = true;
@@ -329,29 +379,32 @@ export async function initAuthNavigation() {
     if (adminLink) {
       adminLink.hidden = !canAccessAdmin(profile);
     }
-    if (!session) return;
 
-    const ordersLink = document.createElement("a");
-    ordersLink.href = "/pedidos/";
-    ordersLink.textContent = "Pedidos";
-    ordersLink.dataset.ordersLink = "true";
-    nav.append(ordersLink);
+    if (!session) {
+      loginLinks.forEach((link) => {
+        link.hidden = false;
+      });
+      return;
+    }
 
-    const cartLink = document.createElement("a");
-    cartLink.href = "/carrinho/";
-    cartLink.textContent = "Carrinho";
-    cartLink.dataset.cartLink = "true";
-    nav.append(cartLink);
-
-    const logoutButton = document.createElement("button");
-    logoutButton.className = "button ghost";
-    logoutButton.type = "button";
-    logoutButton.textContent = "Sair";
-    logoutButton.addEventListener("click", async () => {
-      await signOut();
-      window.location.href = "/";
+    loginLinks.forEach((link) => {
+      link.hidden = true;
     });
-    nav.append(logoutButton);
+
+    appendAuthenticatedLink(nav, "/pedidos/", "Pedidos", "ordersLink");
+    appendAuthenticatedLink(nav, "/carrinho/", "Carrinho", "cartLink");
+
+    const supabase = await getSupabaseClient();
+    const avatarUrl = await resolveAvatarUrl(supabase, profile?.avatar_path);
+    mountUserMenu(nav, {
+      profile,
+      session,
+      avatarUrl,
+      onSignOut: async () => {
+        await signOut();
+        window.location.href = "/login/";
+      },
+    });
   } catch (error) {
     console.warn(error.message);
   }

@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Dados pessoais | IAGO Shopping</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body data-page="profile">
+  <div class="app-shell">
+    <header class="app-header">
+      <a class="brand-mark" href="/" aria-label="IAGO Shopping">
+        <img src="/assets/logos/Logo_IAGO_completa_branca.png" alt="IAGO" class="brand-logo">
+        <span class="brand-divider"></span>
+        <span class="brand-product">Shopping</span>
+      </a>
+
+      <nav class="top-nav" aria-label="Navegação principal">
+        <a href="/catalogo/">Catálogo</a>
+        <a href="/login/">Login</a>
+        <a href="/admin/">Admin</a>
+      </nav>
+    </header>
+
+    <main class="page-main profile-page">
+      <section class="section-head">
+        <div>
+          <span class="eyebrow">Conta</span>
+          <h1>Dados pessoais</h1>
+        </div>
+        <p data-profile-feedback hidden>Carregando dados.</p>
+      </section>
+
+      <form class="profile-form" data-profile-form>
+        <section class="profile-section profile-avatar-editor" aria-labelledby="profile-avatar-title">
+          <div>
+            <span class="card-kicker">Foto de perfil</span>
+            <h2 id="profile-avatar-title">Avatar</h2>
+          </div>
+          <div class="profile-avatar-preview" data-profile-avatar-preview aria-live="polite"></div>
+          <div class="profile-avatar-actions">
+            <label for="profile-avatar">Selecionar foto</label>
+            <input id="profile-avatar" name="avatar" type="file" accept="image/jpeg,image/png,image/webp">
+            <button class="button ghost" type="button" data-avatar-remove>Remover foto</button>
+          </div>
+        </section>
+
+        <section class="profile-section" aria-labelledby="profile-identity-title">
+          <div>
+            <span class="card-kicker">Identificação e contato</span>
+            <h2 id="profile-identity-title">Seu cadastro</h2>
+          </div>
+          <div class="profile-form-grid">
+            <label for="profile-full-name">Nome completo</label>
+            <input id="profile-full-name" name="nomeCompleto" type="text" autocomplete="name" placeholder="Seu nome completo">
+
+            <label for="profile-email">E-mail</label>
+            <input id="profile-email" name="email" type="email" autocomplete="email" readonly>
+
+            <label for="profile-phone">Telefone / WhatsApp</label>
+            <input id="profile-phone" name="telefone" type="tel" autocomplete="tel" placeholder="(00) 00000-0000">
+          </div>
+        </section>
+
+        <section class="profile-section" aria-labelledby="profile-address-title">
+          <div>
+            <span class="card-kicker">Endereço de entrega</span>
+            <h2 id="profile-address-title">Endereço padrão</h2>
+          </div>
+          <div class="profile-form-grid">
+            <label for="address-recipient">Nome do destinatário</label>
+            <input id="address-recipient" name="nomeDestinatario" type="text" autocomplete="name">
+
+            <label for="address-zip">CEP</label>
+            <input id="address-zip" name="cep" type="text" inputmode="numeric" autocomplete="postal-code">
+
+            <label for="address-street">Logradouro</label>
+            <input id="address-street" name="logradouro" type="text" autocomplete="address-line1">
+
+            <label for="address-number">Número</label>
+            <input id="address-number" name="numero" type="text" autocomplete="address-line2">
+
+            <label for="address-extra">Complemento</label>
+            <input id="address-extra" name="complemento" type="text" autocomplete="address-line3">
+
+            <label for="address-neighborhood">Bairro</label>
+            <input id="address-neighborhood" name="bairro" type="text">
+
+            <label for="address-city">Cidade</label>
+            <input id="address-city" name="cidade" type="text" autocomplete="address-level2">
+
+            <label for="address-state">UF</label>
+            <input id="address-state" name="uf" type="text" maxlength="2" autocomplete="address-level1">
+
+            <label for="address-reference">Referência</label>
+            <textarea id="address-reference" name="referencia" rows="3"></textarea>
+          </div>
+        </section>
+
+        <section class="profile-section" aria-labelledby="profile-payment-title">
+          <div>
+            <span class="card-kicker">Preferência de pagamento</span>
+            <h2 id="profile-payment-title">Método inicial do checkout</h2>
+          </div>
+          <div class="profile-form-grid">
+            <label for="payment-preference">Pagamento preferido</label>
+            <select id="payment-preference" name="pagamentoPreferido">
+              <option value="">Pix como padrão</option>
+              <option value="pix">Pix</option>
+              <option value="cartao_debito">Cartão de débito</option>
+              <option value="cartao_credito">Cartão de crédito</option>
+            </select>
+          </div>
+        </section>
+
+        <div class="profile-actions">
+          <button class="button primary" type="submit">Salvar dados</button>
+          <a class="button secondary" href="/catalogo/">Voltar ao catálogo</a>
+        </div>
+      </form>
+    </main>
+  </div>
+
+  <script type="module" src="/core/app.js"></script>
+</body>
+</html>

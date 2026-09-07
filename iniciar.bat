@@ -50,7 +50,7 @@ if exist "%CHROME_PROFILE%" (
 mkdir "%CHROME_PROFILE%" >nul 2>nul
 
 echo Iniciando backend em %APP_URL%...
-start "IAGO Shopping API 8010" /D "%CD%" "%PYTHON_EXE%" -m uvicorn backend.main:app --host %HOST% --port %PORT% --reload
+start "IAGO Shopping API 8010" /D "%CD%" "%PYTHON_EXE%" -B -m uvicorn backend.main:app --host %HOST% --port %PORT%
 
 echo Aguardando health check em %HEALTH_URL%...
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$u='%HEALTH_URL%'; $ok=$false; for ($i=1; $i -le 40; $i++) { try { $r=Invoke-WebRequest -UseBasicParsing -Uri $u -TimeoutSec 2; if ($r.StatusCode -eq 200) { $ok=$true; break } } catch { Start-Sleep -Milliseconds 500 } }; if (-not $ok) { exit 1 }"
