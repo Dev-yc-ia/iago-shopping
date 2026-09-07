@@ -33,7 +33,6 @@ function openMenu(root) {
   const dropdown = root.querySelector("[data-user-menu-dropdown]");
   button.setAttribute("aria-expanded", "true");
   dropdown.hidden = false;
-  dropdown.querySelector("[role='menuitem']")?.focus();
 }
 
 function toggleMenu(root) {
@@ -45,8 +44,17 @@ function toggleMenu(root) {
   openMenu(root);
 }
 
-function isTouchPointer(event) {
-  return event.pointerType === "touch" || event.pointerType === "pen";
+function isTouchActivation(event) {
+  return event.type === "touchend"
+    || event.pointerType === "touch"
+    || event.pointerType === "pen";
+}
+
+function runTouchAction(event, action) {
+  if (!isTouchActivation(event)) return;
+  event.preventDefault();
+  event.stopPropagation();
+  action();
 }
 
 export function mountUserMenu(nav, { profile, session, avatarUrl, onSignOut }) {
@@ -100,12 +108,11 @@ export function mountUserMenu(nav, { profile, session, avatarUrl, onSignOut }) {
   profileLink.href = "/dados-pessoais/";
   profileLink.role = "menuitem";
   profileLink.textContent = "Dados pessoais";
-  profileLink.addEventListener("pointerup", (event) => {
-    if (!isTouchPointer(event)) return;
-    event.preventDefault();
-    event.stopPropagation();
-    window.location.href = profileLink.href;
+  const openProfilePage = (event) => runTouchAction(event, () => {
+    window.location.assign(profileLink.href);
   });
+  profileLink.addEventListener("pointerup", openProfilePage);
+  profileLink.addEventListener("touchend", openProfilePage, { passive: false });
 
   const logoutButton = document.createElement("button");
   logoutButton.className = "user-menu-item";
@@ -126,12 +133,9 @@ export function mountUserMenu(nav, { profile, session, avatarUrl, onSignOut }) {
       console.warn(error.message);
     }
   };
-  logoutButton.addEventListener("pointerup", (event) => {
-    if (!isTouchPointer(event)) return;
-    event.preventDefault();
-    event.stopPropagation();
-    handleSignOut();
-  });
+  const touchSignOut = (event) => runTouchAction(event, handleSignOut);
+  logoutButton.addEventListener("pointerup", touchSignOut);
+  logoutButton.addEventListener("touchend", touchSignOut, { passive: false });
   logoutButton.addEventListener("click", handleSignOut);
 
   dropdown.append(profileLink, logoutButton);
@@ -147,22 +151,20 @@ export function mountUserMenu(nav, { profile, session, avatarUrl, onSignOut }) {
       closeMenu(root, true);
     }
   };
-  const onFocusout = () => {
-    window.setTimeout(() => {
-      if (!root.contains(document.activeElement)) closeMenu(root);
-    }, 0);
+  const onDocumentFocusin = (event) => {
+    if (!root.contains(event.target)) closeMenu(root);
   };
 
   button.addEventListener("click", onButtonClick);
   document.addEventListener("click", onDocumentClick);
   document.addEventListener("keydown", onKeydown);
-  root.addEventListener("focusout", onFocusout);
+  document.addEventListener("focusin", onDocumentFocusin);
 
   cleanupCurrentMenu = () => {
     button.removeEventListener("click", onButtonClick);
     document.removeEventListener("click", onDocumentClick);
     document.removeEventListener("keydown", onKeydown);
-    root.removeEventListener("focusout", onFocusout);
+    document.removeEventListener("focusin", onDocumentFocusin);
     root.remove();
   };
 }

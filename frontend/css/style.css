@@ -162,6 +162,8 @@ textarea {
   color: var(--text-primary);
   cursor: pointer;
   box-shadow: 0 0 18px rgba(25, 221, 218, 0.16);
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .user-avatar-button:focus-visible,
@@ -213,9 +215,13 @@ textarea {
   font-size: 0.9rem;
   font-weight: 760;
   text-align: left;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.user-menu-item:hover {
+.user-menu-item:hover,
+.user-menu-item:active {
   background: rgba(25, 221, 218, 0.08);
   color: var(--text-primary);
 }
@@ -1543,13 +1549,28 @@ textarea {
   .user-menu-dropdown {
     right: 0;
     left: auto;
-    min-width: min(190px, 100%);
+    width: min(220px, calc(100vw - 32px));
+    min-width: min(190px, calc(100vw - 32px));
     max-width: calc(100vw - 32px);
+    padding: 10px;
   }
 
   .top-nav .user-menu {
     flex: 0 0 auto;
     margin-left: auto;
+  }
+
+  .user-menu-item {
+    min-height: 52px;
+    padding: 12px 14px;
+    font-size: 1rem;
+    line-height: 1.2;
+  }
+
+  @media (hover: none) and (pointer: coarse) {
+    .user-menu-item:focus-visible {
+      outline: 0;
+    }
   }
 
   .catalog-layout,
