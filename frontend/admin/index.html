@@ -62,8 +62,8 @@
         <form class="filters-panel product-form" data-product-form>
           <input type="hidden" name="id">
 
-          <label for="product-sku">SKU</label>
-          <input id="product-sku" name="sku" type="text" placeholder="SHAPE-IAGO-825" required>
+          <input type="hidden" name="sku">
+          <div class="sku-status" data-product-sku-display>SKU gerado automaticamente ao salvar</div>
 
           <label for="product-name">Nome</label>
           <input id="product-name" name="nome" type="text" placeholder="Nome do produto" required>
@@ -83,8 +83,16 @@
           <label for="product-price">Preço</label>
           <input id="product-price" name="preco" type="number" min="0" step="0.01" placeholder="0.00" required>
 
-          <label for="product-stock">Estoque</label>
-          <input id="product-stock" name="quantidadeEstoque" type="number" min="0" step="1" inputmode="numeric" value="0" required>
+          <fieldset class="variation-editor">
+            <legend>Tamanho/Variação e estoque</legend>
+            <div class="variation-editor__head">
+              <span>Tamanho/Variação</span>
+              <span>Estoque</span>
+              <span>Remover</span>
+            </div>
+            <div class="variation-editor__rows" data-variation-rows></div>
+            <button class="button secondary variation-editor__add" type="button" data-variation-add>+ Adicionar tamanho</button>
+          </fieldset>
 
           <label for="product-status">Status</label>
           <select id="product-status" name="status">

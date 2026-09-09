@@ -42,8 +42,19 @@ export function createProductCard(product, categoryLabel) {
   detailLink.href = `/produto/?id=${encodeURIComponent(product.id)}`;
   detailLink.textContent = "Ver produto";
 
+  const variationList = document.createElement("div");
+  variationList.className = "product-variation-chips";
+  const availableVariations = product.availableVariations || [];
+  if (availableVariations.length > 1 || availableVariations.some((variation) => variation.name !== "Padrao")) {
+    variationList.replaceChildren(...availableVariations.slice(0, 6).map((variation) => {
+      const chip = document.createElement("span");
+      chip.textContent = variation.name;
+      return chip;
+    }));
+  }
+
   meta.append(price, availability);
-  body.append(brand, title, highlight, meta, detailLink);
+  body.append(brand, title, highlight, meta, variationList, detailLink);
   card.append(visual, body);
 
   return card;

@@ -211,8 +211,25 @@ function firstImageUrl(images = []) {
   return primary?.url || images[0]?.url || "";
 }
 
+function normalizeVariation(variation = {}) {
+  const stock = Number(variation.estoque_atual || variation.estoque || 0);
+  return {
+    id: variation.id || null,
+    sku: variation.sku_variacao || "",
+    name: variation.nome_variacao || variation.valor || variation.tamanho || "",
+    stock,
+    available: variation.ativo !== false && stock > 0,
+    primary: Boolean(variation.principal),
+  };
+}
+
 function normalizeCatalogProduct(product) {
-  const stock = Number(product.quantidade_estoque || 0);
+  const variations = Array.isArray(product.variacoes)
+    ? product.variacoes.map(normalizeVariation).filter((variation) => variation.name)
+    : [];
+  const stock = variations.length
+    ? variations.reduce((total, variation) => total + (variation.available ? variation.stock : 0), 0)
+    : Number(product.quantidade_estoque || 0);
   const images = Array.isArray(product.imagens) ? product.imagens : [];
   return {
     id: product.id,
@@ -222,6 +239,8 @@ function normalizeCatalogProduct(product) {
     price: Number(product.preco || 0),
     availability: stock > 0 ? "disponivel" : "esgotado",
     stock,
+    variations,
+    availableVariations: variations.filter((variation) => variation.available),
     highlight: product.destaque || product.descricao || "Produto publicado no IAGO Shopping.",
     description: product.descricao || "",
     attributes: Array.isArray(product.atributos) ? product.atributos : [],

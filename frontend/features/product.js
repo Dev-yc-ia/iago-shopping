@@ -169,11 +169,52 @@ function setProductGalleryImage(container, image, product) {
   });
 }
 
+function shouldShowVariationSelector(product) {
+  const variations = product.availableVariations || [];
+  return variations.length > 1 || variations.some((variation) => variation.name !== "Padrao");
+}
+
+function renderVariationSelector(product, onSelect) {
+  const variations = product.availableVariations || [];
+  if (!shouldShowVariationSelector(product)) return null;
+
+  const group = document.createElement("div");
+  group.className = "product-variation-selector";
+
+  const label = document.createElement("span");
+  label.className = "card-kicker";
+  label.textContent = "Tamanho";
+
+  const options = document.createElement("div");
+  options.className = "product-variation-options";
+
+  options.replaceChildren(...variations.map((variation) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "variation-option";
+    button.textContent = variation.name;
+    button.dataset.variationId = variation.id;
+    button.addEventListener("click", () => {
+      options.querySelectorAll(".variation-option").forEach((item) => {
+        item.classList.toggle("is-selected", item === button);
+      });
+      onSelect(variation);
+    });
+    return button;
+  }));
+
+  group.append(label, options);
+  return group;
+}
+
 function renderProductDetail(container, product) {
   const status = product.availability === "disponivel" ? "Disponível" : "Esgotado";
   const interestText = product.availability === "esgotado"
     ? "Registrar interesse em esgotados será uma extensão futura."
     : "Estoque real contabilizado por variação.";
+  const availableVariations = product.availableVariations || [];
+  const needsVariationSelection = shouldShowVariationSelector(product);
+  let selectedVariation = needsVariationSelection ? null : availableVariations[0] || null;
 
   const showcase = document.createElement("div");
   showcase.className = "product-showcase";
@@ -205,7 +246,9 @@ function renderProductDetail(container, product) {
   availability.textContent = status;
 
   const stock = document.createElement("span");
-  stock.textContent = `${product.stock} unidades`;
+  stock.textContent = selectedVariation
+    ? `${selectedVariation.stock} unidades`
+    : `${product.stock} unidades`;
 
   const attributes = document.createElement("dl");
   attributes.className = "attributes-list";
@@ -227,21 +270,36 @@ function renderProductDetail(container, product) {
   const cartButton = document.createElement("button");
   cartButton.className = "button primary product-cart-button";
   cartButton.type = "button";
-  cartButton.disabled = product.availability !== "disponivel";
-  cartButton.textContent = product.availability === "disponivel"
-    ? "Adicionar ao carrinho"
-    : "Produto esgotado";
+  cartButton.disabled = product.availability !== "disponivel" || needsVariationSelection;
+  cartButton.textContent = product.availability !== "disponivel"
+    ? "Produto esgotado"
+    : needsVariationSelection
+      ? "Selecione um tamanho"
+      : "Adicionar ao carrinho";
   cartButton.addEventListener("click", async () => {
     try {
-      const added = await addProductToCart(product.id, 1);
+      if (needsVariationSelection && !selectedVariation) {
+        window.alert("Selecione um tamanho antes de adicionar ao carrinho.");
+        return;
+      }
+      const added = await addProductToCart(product.id, 1, selectedVariation?.id || null);
       if (added) window.location.href = "/carrinho/";
     } catch (error) {
       window.alert(error.message);
     }
   });
 
+  const variationSelector = renderVariationSelector(product, (variation) => {
+    selectedVariation = variation;
+    stock.textContent = `${variation.stock} unidades`;
+    cartButton.disabled = false;
+    cartButton.textContent = "Adicionar ao carrinho";
+  });
+
   statusRow.append(availability, stock);
-  info.append(brand, title, description, price, statusRow, cartButton, attributes, extensionNote);
+  info.append(brand, title, description, price, statusRow);
+  if (variationSelector) info.append(variationSelector);
+  info.append(cartButton, attributes, extensionNote);
   showcase.append(visual, info);
   container.replaceChildren(showcase);
 }

@@ -39,6 +39,8 @@ function normalizeCartItem(item) {
     id: item.item_id,
     cartId: item.carrinho_id,
     productId: item.produto_id,
+    variationId: item.variacao_id || null,
+    variationName: item.variacao_nome || "",
     sku: item.sku,
     name: item.nome,
     brand: item.marca,
@@ -60,17 +62,18 @@ async function loadCartItems() {
   return (data || []).map(normalizeCartItem);
 }
 
-export async function addProductToCart(productId, quantity = 1) {
+export async function addProductToCart(productId, quantity = 1, variationId = null) {
   const supabase = await getAuthenticatedCartClient();
   if (!supabase) return false;
 
   const { error } = await supabase.rpc("shopping_carrinho_adicionar_produto", {
     p_produto_id: productId,
     p_quantidade: quantity,
+    p_variacao_id: variationId,
   });
   if (error) throw error;
 
-  recordEvent("cart_add", { productId, quantity });
+  recordEvent("cart_add", { productId, variationId, quantity });
   return true;
 }
 
@@ -134,7 +137,10 @@ function renderCartItem(item, onChange) {
   title.textContent = item.name;
 
   const meta = document.createElement("p");
-  meta.textContent = `${item.sku} | Estoque disponível: ${item.availableStock} un.`;
+  const variationText = item.variationName && item.variationName !== "Padrao"
+    ? ` | Variação: ${item.variationName}`
+    : "";
+  meta.textContent = `${item.sku}${variationText} | Estoque disponível: ${item.availableStock} un.`;
 
   const price = document.createElement("strong");
   price.textContent = formatCurrency(item.unitPrice);

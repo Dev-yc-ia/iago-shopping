@@ -9,9 +9,17 @@ const EMPTY_PRODUCT = {
   categoria: "shapes",
   preco: "",
   quantidade_estoque: 0,
+  variacoes: [],
   descricao: "",
   status: "rascunho",
   imagens: [],
+};
+
+const DEFAULT_VARIATION = {
+  id: null,
+  nome_variacao: "Único",
+  estoque_atual: 0,
+  ativo: true,
 };
 
 const CATEGORY_LABELS = {
@@ -51,6 +59,41 @@ function parseStock(value) {
 function stockLabel(stock) {
   const quantity = parseStock(stock);
   return `${quantity} unidade${quantity === 1 ? "" : "s"}`;
+}
+
+function normalizeVariationName(value) {
+  return String(value || "").trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function normalizeVariation(variation = {}, index = 0) {
+  return {
+    id: variation.id || null,
+    nome_variacao: String(
+      variation.nome_variacao
+        || variation.valor
+        || variation.tamanho
+        || (index === 0 ? DEFAULT_VARIATION.nome_variacao : "")
+    ).trim(),
+    estoque_atual: parseStock(variation.estoque_atual ?? variation.estoque ?? 0),
+    ativo: variation.ativo !== false,
+  };
+}
+
+function variationsForProduct(product = EMPTY_PRODUCT) {
+  const variations = Array.isArray(product.variacoes)
+    ? product.variacoes.map(normalizeVariation).filter((variation) => variation.ativo)
+    : [];
+
+  if (variations.length) return variations;
+
+  return [{
+    ...DEFAULT_VARIATION,
+    estoque_atual: parseStock(product.quantidade_estoque),
+  }];
+}
+
+function variationTotal(variations = []) {
+  return variations.reduce((total, variation) => total + parseStock(variation.estoque_atual), 0);
 }
 
 function firstImageUrl(images = []) {
@@ -277,9 +320,8 @@ async function saveProduct(product) {
   const imagens = uploadedImages.length ? uploadedImages : product.imagens;
 
   try {
-    const { error } = await supabase.rpc("shopping_admin_salvar_produto_com_estoque", {
+    const { error } = await supabase.rpc("shopping_admin_salvar_produto_com_variacoes", {
       p_id: product.id,
-      p_sku: product.sku,
       p_nome: product.nome,
       p_marca: product.marca,
       p_categoria: product.categoria,
@@ -289,7 +331,7 @@ async function saveProduct(product) {
       p_atributos: [],
       p_imagens: imagens,
       p_status: product.status,
-      p_quantidade_estoque: parseStock(product.quantidadeEstoque),
+      p_variacoes: product.variacoes,
     });
     if (error) throw error;
   } catch (error) {
@@ -311,6 +353,46 @@ function getFormValue(form, name) {
   return form.elements[name]?.value || "";
 }
 
+function readVariationRows(form) {
+  const rows = Array.from(form.querySelectorAll("[data-variation-row]"));
+  if (!rows.length) {
+    throw new Error("Cadastre pelo menos uma variação com estoque.");
+  }
+
+  const seen = new Set();
+  return rows.map((row) => {
+    const name = row.querySelector("[data-variation-name]")?.value.trim() || "";
+    const stockValue = row.querySelector("[data-variation-stock]")?.value;
+    const stock = Number.parseInt(stockValue, 10);
+    const key = normalizeVariationName(name);
+
+    if (!name) {
+      throw new Error("Tamanho/variação não pode ficar vazio.");
+    }
+    if (!Number.isFinite(stock) || stock < 0) {
+      throw new Error(`Estoque inválido para a variação ${name}.`);
+    }
+    if (seen.has(key)) {
+      throw new Error(`Variação duplicada: ${name}.`);
+    }
+
+    seen.add(key);
+    return {
+      id: row.dataset.variationId || null,
+      nome_variacao: name,
+      estoque_atual: stock,
+    };
+  });
+}
+
+function readVariationRowsQuietly(form) {
+  try {
+    return readVariationRows(form);
+  } catch {
+    return [];
+  }
+}
+
 function readProductForm(form) {
   return {
     id: getFormValue(form, "id") || null,
@@ -319,12 +401,70 @@ function readProductForm(form) {
     marca: getFormValue(form, "marca"),
     categoria: getFormValue(form, "categoria"),
     preco: getFormValue(form, "preco"),
-    quantidadeEstoque: getFormValue(form, "quantidadeEstoque"),
+    variacoes: readVariationRows(form),
     descricao: getFormValue(form, "descricao"),
     status: getFormValue(form, "status"),
     fotosProduto: getSelectedPhotos(form),
     imagens: normalizeImagesWithCover(currentPersistedImages),
   };
+}
+
+function renderVariationRows(form, variations = [DEFAULT_VARIATION]) {
+  const container = form.querySelector("[data-variation-rows]");
+  if (!container) return;
+
+  const normalized = variations.length ? variations.map(normalizeVariation) : [DEFAULT_VARIATION];
+  container.replaceChildren(...normalized.map((variation) => {
+    const row = document.createElement("div");
+    row.className = "variation-editor__row";
+    row.dataset.variationRow = "";
+    if (variation.id) row.dataset.variationId = variation.id;
+
+    const name = document.createElement("input");
+    name.type = "text";
+    name.placeholder = "34, P, 8.125, Único";
+    name.value = variation.nome_variacao;
+    name.required = true;
+    name.dataset.variationName = "";
+
+    const stock = document.createElement("input");
+    stock.type = "number";
+    stock.min = "0";
+    stock.step = "1";
+    stock.inputMode = "numeric";
+    stock.value = parseStock(variation.estoque_atual);
+    stock.required = true;
+    stock.dataset.variationStock = "";
+
+    const remove = document.createElement("button");
+    remove.className = "button ghost variation-editor__remove";
+    remove.type = "button";
+    remove.textContent = "x";
+    remove.setAttribute("aria-label", `Remover variação ${variation.nome_variacao || ""}`.trim());
+    remove.disabled = normalized.length <= 1;
+    remove.addEventListener("click", () => {
+      row.remove();
+      updateVariationRemoveButtons(form);
+      updateLivePreview(form);
+    });
+
+    name.addEventListener("input", () => updateLivePreview(form));
+    stock.addEventListener("input", () => updateLivePreview(form));
+
+    row.append(name, stock, remove);
+    return row;
+  }));
+
+  updateVariationRemoveButtons(form);
+}
+
+function updateVariationRemoveButtons(form) {
+  const rows = Array.from(form.querySelectorAll("[data-variation-row]"));
+  rows.forEach((row) => {
+    const remove = row.querySelector("[data-variation-row] .variation-editor__remove")
+      || row.querySelector(".variation-editor__remove");
+    if (remove) remove.disabled = rows.length <= 1;
+  });
 }
 
 function fillProductForm(form, product = EMPTY_PRODUCT) {
@@ -338,9 +478,16 @@ function fillProductForm(form, product = EMPTY_PRODUCT) {
   form.elements.marca.value = product.marca || "";
   form.elements.categoria.value = product.categoria || "shapes";
   form.elements.preco.value = product.preco ?? "";
-  form.elements.quantidadeEstoque.value = product.quantidade_estoque ?? 0;
   form.elements.descricao.value = product.descricao || "";
   form.elements.status.value = product.status || "rascunho";
+  renderVariationRows(form, variationsForProduct(product));
+
+  const skuDisplay = form.querySelector("[data-product-sku-display]");
+  if (skuDisplay) {
+    skuDisplay.textContent = product.sku
+      ? `SKU: ${product.sku}`
+      : "SKU gerado automaticamente ao salvar";
+  }
 
   refreshPhotoPreview(form);
 }
@@ -354,7 +501,7 @@ function updateLivePreview(form, imageUrl = firstImageUrl(currentPreviewImages()
   if (!card) return;
 
   const status = getFormValue(form, "status") || "rascunho";
-  const stock = parseStock(getFormValue(form, "quantidadeEstoque"));
+  const stock = variationTotal(readVariationRowsQuietly(form));
   card.classList.toggle("is-muted", status === "arquivado" || stock === 0);
 
   renderVisualPreview(card.querySelector("[data-preview-visual]"), imageUrl);
@@ -465,6 +612,47 @@ export function initAdminProducts() {
   form.addEventListener("change", () => updateLivePreview(form));
   form.elements.fotosProduto?.addEventListener("change", () => {
     setSelectedPhotos(getSelectedPhotos(form), form);
+  });
+
+  form.querySelector("[data-variation-add]")?.addEventListener("click", () => {
+    const rows = form.querySelector("[data-variation-rows]");
+    const next = document.createElement("div");
+    next.className = "variation-editor__row";
+    next.dataset.variationRow = "";
+
+    const name = document.createElement("input");
+    name.type = "text";
+    name.placeholder = "34, P, 8.125, Único";
+    name.required = true;
+    name.dataset.variationName = "";
+
+    const stock = document.createElement("input");
+    stock.type = "number";
+    stock.min = "0";
+    stock.step = "1";
+    stock.inputMode = "numeric";
+    stock.value = "0";
+    stock.required = true;
+    stock.dataset.variationStock = "";
+
+    const remove = document.createElement("button");
+    remove.className = "button ghost variation-editor__remove";
+    remove.type = "button";
+    remove.textContent = "x";
+    remove.setAttribute("aria-label", "Remover variação");
+    remove.addEventListener("click", () => {
+      next.remove();
+      updateVariationRemoveButtons(form);
+      updateLivePreview(form);
+    });
+
+    name.addEventListener("input", () => updateLivePreview(form));
+    stock.addEventListener("input", () => updateLivePreview(form));
+
+    next.append(name, stock, remove);
+    rows?.append(next);
+    updateVariationRemoveButtons(form);
+    name.focus();
   });
 
   form.querySelector("[data-product-reset]")?.addEventListener("click", () => {

@@ -550,6 +550,60 @@ textarea {
   color: var(--text-secondary);
 }
 
+.sku-status {
+  padding: 11px 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.035);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.variation-editor {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+}
+
+.variation-editor legend {
+  padding: 0 6px;
+  color: var(--text-primary);
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.variation-editor__head,
+.variation-editor__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 86px 72px;
+  gap: 8px;
+  align-items: center;
+}
+
+.variation-editor__head {
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.variation-editor__row input {
+  min-width: 0;
+}
+
+.variation-editor__remove {
+  min-width: 0;
+  width: 100%;
+}
+
+.variation-editor__add {
+  width: 100%;
+}
+
 .product-photo-gallery-preview {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
@@ -811,6 +865,46 @@ textarea {
   color: var(--text-primary);
   font-size: 1rem;
   font-weight: 900;
+}
+
+.product-variation-chips,
+.product-variation-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 2px 0 12px;
+}
+
+.product-variation-chips span,
+.variation-option {
+  min-width: 38px;
+  min-height: 30px;
+  display: inline-grid;
+  place-items: center;
+  padding: 6px 9px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 0.76rem;
+  font-weight: 850;
+}
+
+.product-card:hover .product-variation-chips span,
+.product-card:focus-within .product-variation-chips span,
+.variation-option.is-selected {
+  border-color: var(--accent);
+  color: var(--text-primary);
+  background: rgba(25, 221, 218, 0.1);
+}
+
+.product-variation-selector {
+  display: grid;
+  gap: 8px;
+}
+
+.variation-option {
+  cursor: pointer;
 }
 
 .product-price {
@@ -1714,6 +1808,11 @@ textarea {
   .cart-item-controls {
     grid-column: 1 / -1;
     width: 100%;
+  }
+
+  .variation-editor__head,
+  .variation-editor__row {
+    grid-template-columns: minmax(0, 1fr) 74px 48px;
   }
 
   .order-card-header,

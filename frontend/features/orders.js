@@ -69,6 +69,8 @@ function normalizeOrder(order) {
     items: items.map((item) => ({
       id: item.item_id,
       productId: item.produto_id,
+      variationId: item.variacao_id || null,
+      variationName: item.variacao_nome || "",
       sku: item.sku,
       name: item.nome,
       brand: item.marca,
@@ -112,7 +114,10 @@ function renderOrderItem(item) {
   title.textContent = item.name;
 
   const meta = document.createElement("span");
-  meta.textContent = `${item.sku} | ${item.quantity} un.`;
+  const variationText = item.variationName && item.variationName !== "Padrao"
+    ? ` | Variação: ${item.variationName}`
+    : "";
+  meta.textContent = `${item.sku}${variationText} | ${item.quantity} un.`;
 
   content.append(brand, title, meta);
 
