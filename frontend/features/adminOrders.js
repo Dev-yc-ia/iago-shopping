@@ -1,6 +1,11 @@
 import { getSupabaseClient } from "./auth.js";
 import { formatCurrency } from "../utils/format.js";
-import { PAYMENT_METHOD_LABELS, PAYMENT_STATUS_LABELS } from "./payments.js";
+import {
+  PAYMENT_METHOD_LABELS,
+  PAYMENT_STATUS_LABELS,
+  cancelPaymentAttempt,
+  getPaymentEngineMetadata,
+} from "./payments.js";
 
 const ORDER_STATUS_LABELS = {
   pendente_pagamento: "Pendente de pagamento",
@@ -17,11 +22,14 @@ function formatDate(value) {
 
 function normalizeAdminOrder(order) {
   const items = Array.isArray(order.itens) ? order.itens : [];
+  const internalNumber = order.numero;
   return {
     id: order.id,
-    number: order.numero,
+    internalNumber,
+    number: order.numero_cliente || internalNumber,
     status: order.status,
     paymentStatus: order.pagamento_status || "pendente",
+    paymentId: order.pagamento_id || null,
     paymentProvider: order.pagamento_provedor || "mock",
     paymentProviderMode: order.pagamento_provider_mode || "",
     paymentProviderPaymentId: order.pagamento_provider_payment_id || "",
@@ -30,9 +38,37 @@ function normalizeAdminOrder(order) {
     customerName: order.cliente_nome || "Cliente",
     customerEmail: order.cliente_email || "E-mail não informado",
     total: Number(order.total || 0),
+    canceledAt: order.cancelado_em || "",
+    canceledByType: order.cancelado_por_tipo || "",
+    cancellationReason: order.motivo_cancelamento || "",
     createdAt: order.criado_em,
     items,
   };
+}
+
+function isFinalPaymentStatus(status) {
+  return ["aprovado", "recusado", "expirado", "cancelado"].includes(status);
+}
+
+function hasActivePaymentAttempt(order) {
+  return Boolean(order?.paymentId) && !isFinalPaymentStatus(order.paymentStatus);
+}
+
+function canCancelAdminOrder(order, isMaster) {
+  return isMaster && order.status !== "cancelado" && order.paymentStatus !== "aprovado";
+}
+
+async function cancelAdminOrder(order, motivo, paymentEngine) {
+  if (hasActivePaymentAttempt(order)) {
+    await cancelPaymentAttempt(order, paymentEngine);
+  }
+
+  const supabase = await getSupabaseClient();
+  const { error } = await supabase.rpc("shopping_admin_cancelar_pedido", {
+    p_pedido_id: order.id,
+    p_motivo: motivo,
+  });
+  if (error) throw error;
 }
 
 async function loadAdminOrders() {
@@ -49,16 +85,21 @@ async function loadAdminPayments() {
   return data || [];
 }
 
-function renderAdminOrder(order) {
+function renderAdminOrder(order, handlers) {
   const card = document.createElement("article");
   card.className = "admin-card order-admin-card";
 
   const status = document.createElement("span");
   status.className = "card-kicker";
-  status.textContent = PAYMENT_STATUS_LABELS[order.paymentStatus] || ORDER_STATUS_LABELS[order.status] || order.status;
+  status.textContent = order.status === "cancelado"
+    ? "Pedido cancelado"
+    : PAYMENT_STATUS_LABELS[order.paymentStatus] || ORDER_STATUS_LABELS[order.status] || order.status;
 
   const title = document.createElement("h2");
   title.textContent = `Pedido #${order.number}`;
+
+  const internalRef = document.createElement("p");
+  internalRef.textContent = `Ref. interna #${order.internalNumber}`;
 
   const customer = document.createElement("p");
   customer.textContent = `${order.customerName} | ${order.customerEmail}`;
@@ -77,9 +118,20 @@ function renderAdminOrder(order) {
 
   const note = document.createElement("p");
   note.className = "extension-note";
-  note.textContent = "Pagamento acompanhado pelo Payment Engine.";
+  note.textContent = order.status === "cancelado"
+    ? `${order.cancellationReason || "Pedido cancelado."}${order.canceledAt ? ` | ${formatDate(order.canceledAt)}` : ""}`
+    : "Pagamento acompanhado pelo Payment Engine.";
 
-  card.append(status, title, customer, date, total, items, payment, note);
+  card.append(status, title, internalRef, customer, date, total, items, payment, note);
+  if (canCancelAdminOrder(order, handlers.isMaster)) {
+    const cancelButton = document.createElement("button");
+    cancelButton.className = "button secondary order-cancel-button";
+    cancelButton.type = "button";
+    cancelButton.textContent = "Cancelar pedido";
+    cancelButton.disabled = handlers.processingOrderId === order.id;
+    cancelButton.addEventListener("click", () => handlers.onCancelOrder(order, cancelButton));
+    card.append(cancelButton);
+  }
   return card;
 }
 
@@ -119,18 +171,45 @@ function renderAdminPayment(payment) {
   return card;
 }
 
-export async function initAdminOrders() {
+export async function initAdminOrders({ isMaster = false } = {}) {
   const container = document.querySelector("[data-admin-orders]");
   const feedback = document.querySelector("[data-admin-orders-feedback]");
   const paymentsContainer = document.querySelector("[data-admin-payments]");
   const paymentsFeedback = document.querySelector("[data-admin-payments-feedback]");
   if (!container) return;
+  let paymentEngine = null;
+  let processingOrderId = "";
 
-  try {
-    const [orders, payments] = await Promise.all([
+  async function onCancelOrder(order, button) {
+    const motivo = window.prompt("Motivo do cancelamento:");
+    if (!motivo || !motivo.trim()) {
+      window.alert("Informe o motivo para cancelar como master.");
+      return;
+    }
+
+    processingOrderId = order.id;
+    button.disabled = true;
+    button.textContent = "Cancelando...";
+    try {
+      await cancelAdminOrder(order, motivo.trim(), paymentEngine);
+      processingOrderId = "";
+      await refresh();
+    } catch (error) {
+      window.alert(error.message);
+      processingOrderId = "";
+      await refresh();
+    } finally {
+      processingOrderId = "";
+    }
+  }
+
+  async function refresh() {
+    const [orders, payments, engine] = await Promise.all([
       loadAdminOrders(),
       loadAdminPayments(),
+      getPaymentEngineMetadata(),
     ]);
+    paymentEngine = engine;
     if (feedback) {
       feedback.textContent = `${orders.length} pedido${orders.length === 1 ? "" : "s"} recebido${orders.length === 1 ? "" : "s"}.`;
     }
@@ -146,7 +225,11 @@ export async function initAdminOrders() {
       return;
     }
 
-    container.replaceChildren(...orders.map(renderAdminOrder));
+    container.replaceChildren(...orders.map((order) => renderAdminOrder(order, {
+      isMaster,
+      processingOrderId,
+      onCancelOrder,
+    })));
     if (paymentsContainer) {
       if (!payments.length) {
         const emptyPayments = document.createElement("div");
@@ -157,6 +240,10 @@ export async function initAdminOrders() {
         paymentsContainer.replaceChildren(...payments.map(renderAdminPayment));
       }
     }
+  }
+
+  try {
+    await refresh();
   } catch (error) {
     if (feedback) feedback.textContent = error.message;
     if (paymentsFeedback) paymentsFeedback.textContent = error.message;

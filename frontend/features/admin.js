@@ -141,7 +141,7 @@ export function initAdminPage() {
       const { profile } = authState;
       renderAdminState(profile);
       initAdminProducts();
-      initAdminOrders();
+      initAdminOrders({ isMaster: profile.papel === "master" });
       if (profile.papel === "master") {
         loadMasterProfiles();
       }

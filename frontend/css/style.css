@@ -1507,6 +1507,12 @@ textarea {
   color: #ffb3b3;
 }
 
+.order-cancel-button {
+  width: 100%;
+  border-color: rgba(255, 107, 107, 0.42);
+  color: #ffb3b3;
+}
+
 .checkout-pix-box {
   display: grid;
   gap: 12px;

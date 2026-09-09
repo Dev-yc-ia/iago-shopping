@@ -57,9 +57,11 @@ async function loadPreferredPaymentMethod() {
 
 function normalizeOrder(order) {
   const items = Array.isArray(order.itens) ? order.itens : [];
+  const internalNumber = order.numero;
   return {
     id: order.id,
-    number: order.numero,
+    internalNumber,
+    number: order.numero_cliente || internalNumber,
     status: order.status,
     paymentStatus: order.pagamento_status || "pendente",
     paymentId: order.pagamento_id || null,
@@ -107,6 +109,7 @@ async function loadCheckoutOrder() {
 
 function paymentStatusText(order, processing = false) {
   if (processing) return "Processando pagamento";
+  if (order.status === "cancelado") return "Pedido cancelado";
   if (order.paymentErrorCode === "mock_timeout") return "Tempo esgotado";
   if (order.paymentStatus === "expirado" && order.paymentMethod === "pix") return "PIX expirado";
   return PAYMENT_STATUS_LABELS[order.paymentStatus] || order.paymentStatus;
@@ -117,6 +120,7 @@ function paymentMessage(order, processing = false, method = order.paymentMethod)
     return "Tokenizando cartão, enviando ao Mercado Pago e aguardando confirmação automática.";
   }
   if (processing) return "Gerando pagamento Pix e aguardando confirmação automática do provider.";
+  if (order.status === "cancelado") return "Pedido cancelado. O histórico permanece em Meus pedidos.";
   if (order.paymentStatus === "aprovado") return "Pagamento confirmado. Seu pedido já está aprovado e o estoque foi reservado.";
   if (order.paymentErrorMessage) return order.paymentErrorMessage;
   if (order.paymentStatus === "recusado") return "Pagamento recusado. Você pode iniciar uma nova tentativa com outro método.";
@@ -384,7 +388,7 @@ function renderCheckout(root, summary, order, paymentEngine, selectedMethod, han
 
   panel.append(status, total, message);
 
-  if (order.paymentStatus !== "aprovado") {
+  if (order.status !== "cancelado" && order.paymentStatus !== "aprovado") {
     const activeAttempt = hasActivePaymentAttempt(order);
     panel.append(renderMethodSelector(selectedMethod, handlers.onMethodSelect));
 

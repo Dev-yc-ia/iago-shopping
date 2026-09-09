@@ -2,7 +2,11 @@ import { getSupabaseClient } from "./auth.js";
 import { createProductImage } from "../ui/productImage.js";
 import { recordEvent } from "../utils/analytics.js";
 import { formatCurrency } from "../utils/format.js";
-import { PAYMENT_STATUS_LABELS } from "./payments.js";
+import {
+  PAYMENT_STATUS_LABELS,
+  cancelPaymentAttempt,
+  getPaymentEngineMetadata,
+} from "./payments.js";
 
 const ORDER_STATUS_LABELS = {
   pendente_pagamento: "Pendente de pagamento",
@@ -41,9 +45,11 @@ function formatDate(value) {
 
 function normalizeOrder(order) {
   const items = Array.isArray(order.itens) ? order.itens : [];
+  const internalNumber = order.numero;
   return {
     id: order.id,
-    number: order.numero,
+    internalNumber,
+    number: order.numero_cliente || internalNumber,
     status: order.status,
     paymentStatus: order.pagamento_status || "pendente",
     paymentId: order.pagamento_id || null,
@@ -65,6 +71,9 @@ function normalizeOrder(order) {
     paymentLastSync: order.pagamento_ultima_sincronizacao || "",
     total: Number(order.total || 0),
     currency: order.moeda || "BRL",
+    canceledAt: order.cancelado_em || "",
+    canceledByType: order.cancelado_por_tipo || "",
+    cancellationReason: order.motivo_cancelamento || "",
     createdAt: order.criado_em,
     items: items.map((item) => ({
       id: item.item_id,
@@ -81,6 +90,38 @@ function normalizeOrder(order) {
       subtotal: Number(item.subtotal || 0),
     })),
   };
+}
+
+function isFinalPaymentStatus(status) {
+  return ["aprovado", "recusado", "expirado", "cancelado"].includes(status);
+}
+
+function hasActivePaymentAttempt(order) {
+  return Boolean(order?.paymentId) && !isFinalPaymentStatus(order.paymentStatus);
+}
+
+function canCancelOrder(order) {
+  return order.status !== "cancelado" && order.paymentStatus !== "aprovado";
+}
+
+async function cancelCustomerOrder(order, paymentEngine) {
+  if (!window.confirm("Tem certeza que deseja cancelar este pedido?")) return false;
+
+  if (hasActivePaymentAttempt(order)) {
+    await cancelPaymentAttempt(order, paymentEngine);
+  }
+
+  const supabase = await getAuthenticatedOrdersClient();
+  if (!supabase) return false;
+
+  const { error } = await supabase.rpc("shopping_pedido_cliente_cancelar", {
+    p_pedido_id: order.id,
+    p_motivo: "Cancelado pelo cliente",
+  });
+  if (error) throw error;
+
+  recordEvent("order_cancel_customer", { orderId: order.id, paymentId: order.paymentId });
+  return true;
 }
 
 async function loadOrders() {
@@ -130,6 +171,7 @@ function renderOrderItem(item) {
 
 function paymentStatusText(order, isProcessing = false) {
   if (isProcessing) return "Processando pagamento";
+  if (order.status === "cancelado") return "Pedido cancelado";
   if (order.paymentErrorCode === "mock_timeout") return "Tempo esgotado no processamento";
   if (order.paymentStatus === "expirado" && order.paymentMethod === "pix") return "PIX expirado";
   return PAYMENT_STATUS_LABELS[order.paymentStatus] || order.paymentStatus;
@@ -138,6 +180,12 @@ function paymentStatusText(order, isProcessing = false) {
 function paymentMessageText(order, isProcessing = false) {
   if (isProcessing) {
     return "Payment Engine processando a tentativa. O pedido será atualizado automaticamente.";
+  }
+
+  if (order.status === "cancelado") {
+    const date = order.canceledAt ? ` em ${formatDate(order.canceledAt)}` : "";
+    const actor = order.canceledByType === "master" ? "pelo master" : "pelo cliente";
+    return `Pedido cancelado ${actor}${date}.`;
   }
 
   if (order.paymentStatus === "aprovado") {
@@ -182,7 +230,16 @@ function renderPaymentSummary(order) {
   return panel;
 }
 
-function renderOrderCard(order, highlightedId) {
+function renderCancellationDetails(order) {
+  if (order.status !== "cancelado") return null;
+
+  const note = document.createElement("p");
+  note.className = "extension-note";
+  note.textContent = order.cancellationReason || "Pedido cancelado.";
+  return note;
+}
+
+function renderOrderCard(order, highlightedId, handlers) {
   const card = document.createElement("article");
   card.className = "order-card";
   card.classList.toggle("is-highlighted", order.id === highlightedId);
@@ -218,11 +275,28 @@ function renderOrderCard(order, highlightedId) {
   checkoutLink.href = `/checkout/?pedido=${encodeURIComponent(order.id)}`;
   checkoutLink.textContent = order.paymentStatus === "aprovado" ? "Ver checkout" : "Continuar pagamento";
 
-  card.append(header, itemList, paymentSummary, checkoutLink);
+  card.append(header, itemList, paymentSummary);
+  const cancellationDetails = renderCancellationDetails(order);
+  if (cancellationDetails) card.append(cancellationDetails);
+
+  if (order.status !== "cancelado") {
+    card.append(checkoutLink);
+  }
+
+  if (canCancelOrder(order)) {
+    const cancelButton = document.createElement("button");
+    cancelButton.className = "button secondary order-cancel-button";
+    cancelButton.type = "button";
+    cancelButton.textContent = "Cancelar pedido";
+    cancelButton.disabled = handlers.processingOrderId === order.id;
+    cancelButton.addEventListener("click", () => handlers.onCancelOrder(order, cancelButton));
+    card.append(cancelButton);
+  }
+
   return card;
 }
 
-function renderOrders(container, summary, orders) {
+function renderOrders(container, summary, orders, handlers) {
   const highlightedId = new URLSearchParams(window.location.search).get("pedido");
   const totalItems = orders.reduce((sum, order) => sum + order.items.length, 0);
 
@@ -238,7 +312,7 @@ function renderOrders(container, summary, orders) {
     return;
   }
 
-  container.replaceChildren(...orders.map((order) => renderOrderCard(order, highlightedId)));
+  container.replaceChildren(...orders.map((order) => renderOrderCard(order, highlightedId, handlers)));
   recordEvent("orders_view", { orders: orders.length, items: totalItems });
 }
 
@@ -246,14 +320,37 @@ export async function initOrdersPage() {
   const container = document.querySelector("[data-orders-list]");
   const summary = document.querySelector("[data-orders-summary]");
   if (!container) return;
+  let paymentEngine = null;
+  let processingOrderId = "";
 
   async function refreshOrders() {
     try {
-      const orders = await loadOrders();
-      renderOrders(container, summary, orders);
+      const [orders, engine] = await Promise.all([
+        loadOrders(),
+        getPaymentEngineMetadata(),
+      ]);
+      paymentEngine = engine;
+      renderOrders(container, summary, orders, {
+        processingOrderId,
+        onCancelOrder,
+      });
     } catch (error) {
       container.replaceChildren();
       if (summary) summary.textContent = error.message;
+    }
+  }
+
+  async function onCancelOrder(order, button) {
+    processingOrderId = order.id;
+    button.disabled = true;
+    button.textContent = "Cancelando...";
+    try {
+      await cancelCustomerOrder(order, paymentEngine);
+    } catch (error) {
+      window.alert(error.message);
+    } finally {
+      processingOrderId = "";
+      await refreshOrders();
     }
   }
 
