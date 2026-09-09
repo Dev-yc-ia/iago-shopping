@@ -41,7 +41,7 @@ export function createProductCard(product, categoryLabel) {
   const detailLink = document.createElement("a");
   detailLink.className = "card-link";
   detailLink.href = `/produto/?id=${encodeURIComponent(product.id)}`;
-  detailLink.textContent = "Ver produto";
+  detailLink.textContent = product.availability === "esgotado" ? "Estou interessado" : "Ver produto";
 
   const variationList = document.createElement("div");
   variationList.className = "product-variation-chips";

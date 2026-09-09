@@ -15,8 +15,13 @@ function categoryLabel(categoryId) {
   return CATEGORIES.find((category) => category.id === categoryId)?.label || categoryId;
 }
 
-function buildOptions(select) {
-  select.replaceChildren(...CATEGORIES.map((category) => {
+function visibleCategoriesFromProducts(products) {
+  const categoryIds = new Set(products.map((product) => product.category).filter(Boolean));
+  return CATEGORIES.filter((category) => category.id === "todos" || categoryIds.has(category.id));
+}
+
+function buildOptions(select, categories) {
+  select.replaceChildren(...categories.map((category) => {
     const option = document.createElement("option");
     option.value = category.id;
     option.textContent = category.label;
@@ -34,8 +39,8 @@ function buildBrandOptions(select, products) {
   }));
 }
 
-function buildTabs(container, onSelect) {
-  container.replaceChildren(...CATEGORIES.map((category) => {
+function buildTabs(container, categories, onSelect) {
+  container.replaceChildren(...categories.map((category) => {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "category-tab";
@@ -70,18 +75,32 @@ function filterProducts(products, { search, category, availability, brand }) {
   });
 }
 
-function sortProducts(products, sortMode) {
-  const sorted = [...products];
+function availabilityWeight(product) {
+  return product.availability === "esgotado" ? 1 : 0;
+}
+
+function compareProductsBySortMode(left, right, sortMode) {
   if (sortMode === "menor-preco") {
-    sorted.sort((a, b) => a.price - b.price);
+    return left.product.price - right.product.price;
   }
   if (sortMode === "maior-preco") {
-    sorted.sort((a, b) => b.price - a.price);
+    return right.product.price - left.product.price;
   }
   if (sortMode === "nome") {
-    sorted.sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+    return left.product.name.localeCompare(right.product.name, "pt-BR");
   }
-  return sorted;
+  return 0;
+}
+
+function sortProducts(products, sortMode) {
+  return products
+    .map((product, index) => ({ product, index }))
+    .sort((left, right) => (
+      availabilityWeight(left.product) - availabilityWeight(right.product)
+      || compareProductsBySortMode(left, right, sortMode)
+      || left.index - right.index
+    ))
+    .map((item) => item.product);
 }
 
 function paginateProducts(products, page) {
@@ -120,8 +139,9 @@ export async function initCatalogPage() {
   let filtersCollapsed = DEFAULT_FILTERS_COLLAPSED;
   const savedContext = readCatalogContext();
   const products = await getCatalogProducts();
+  const visibleCategories = visibleCategoriesFromProducts(products);
 
-  buildOptions(category);
+  buildOptions(category, visibleCategories);
   buildBrandOptions(brand, products);
 
   function currentFilters() {
@@ -185,7 +205,7 @@ export async function initCatalogPage() {
     return !mobileCatalog.matches;
   }
 
-  buildTabs(tabs, (categoryId) => {
+  buildTabs(tabs, visibleCategories, (categoryId) => {
     category.value = categoryId;
     currentPage = 1;
     render();

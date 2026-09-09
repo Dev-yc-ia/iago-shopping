@@ -2,6 +2,7 @@ import { CATEGORIES, getCatalogProducts } from "../config/products.js";
 import { recordEvent } from "../utils/analytics.js";
 import { formatCurrency } from "../utils/format.js";
 import { createProductImage, setProductImage } from "../ui/productImage.js";
+import { getSupabaseClient } from "./auth.js";
 import { addProductToCart } from "./cart.js";
 import { readCatalogContext, resolveAdjacentProductIds } from "./catalogState.js";
 
@@ -207,11 +208,121 @@ function renderVariationSelector(product, onSelect) {
   return group;
 }
 
+function currentRelativeProductUrl() {
+  return `/produto/${window.location.search}`;
+}
+
+function redirectToInterestLogin(productId) {
+  recordEvent("product_interest_login_required", { productId });
+  const redirect = encodeURIComponent(currentRelativeProductUrl());
+  window.location.href = `/login/?aviso=interesse&redirect=${redirect}`;
+}
+
+async function getAuthenticatedInterestClient(productId) {
+  const supabase = await getSupabaseClient();
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw error;
+
+  if (!data.session?.user) {
+    redirectToInterestLogin(productId);
+    return null;
+  }
+
+  return supabase;
+}
+
+async function loadProductInterestStatus(productId) {
+  const supabase = await getSupabaseClient();
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) throw sessionError;
+  if (!sessionData.session?.user) return false;
+
+  const { data, error } = await supabase.rpc("shopping_produto_interesse_status", {
+    p_produto_id: productId,
+  });
+  if (error) throw error;
+
+  const status = Array.isArray(data) ? data[0] : data;
+  return Boolean(status?.registrado);
+}
+
+async function registerProductInterest(productId) {
+  const supabase = await getAuthenticatedInterestClient(productId);
+  if (!supabase) return null;
+
+  const { data, error } = await supabase.rpc("shopping_produto_interesse_registrar", {
+    p_produto_id: productId,
+  });
+  if (error) throw error;
+
+  const result = Array.isArray(data) ? data[0] : data;
+  recordEvent("product_interest_register", {
+    productId,
+    created: Boolean(result?.criado),
+  });
+  return result;
+}
+
+function setInterestRegistered(button, feedback, message) {
+  button.disabled = true;
+  button.textContent = "Interesse registrado";
+  feedback.dataset.tone = "success";
+  feedback.textContent = message || "Interesse registrado! A IAGO vai considerar essa demanda nas próximas encomendas.";
+}
+
+function createSoldOutInterestPanel(product) {
+  const panel = document.createElement("div");
+  panel.className = "product-interest-panel";
+
+  const title = document.createElement("strong");
+  title.textContent = "Quer esse produto?";
+
+  const message = document.createElement("p");
+  message.textContent = "Registre seu interesse para a IAGO avaliar uma nova encomenda.";
+
+  const button = document.createElement("button");
+  button.className = "button primary product-interest-button";
+  button.type = "button";
+  button.textContent = "Registrar interesse";
+
+  const feedback = document.createElement("p");
+  feedback.className = "product-interest-feedback";
+  feedback.setAttribute("role", "status");
+
+  button.addEventListener("click", async () => {
+    const originalLabel = button.textContent;
+    button.disabled = true;
+    button.textContent = "Registrando...";
+    feedback.textContent = "";
+
+    try {
+      const result = await registerProductInterest(product.id);
+      if (!result) return;
+
+      setInterestRegistered(button, feedback, result.mensagem);
+    } catch (error) {
+      button.disabled = false;
+      button.textContent = originalLabel;
+      feedback.dataset.tone = "error";
+      feedback.textContent = error.message;
+    }
+  });
+
+  loadProductInterestStatus(product.id)
+    .then((registered) => {
+      if (registered) {
+        setInterestRegistered(button, feedback, "Seu interesse neste produto já está registrado.");
+      }
+    })
+    .catch((error) => console.warn(error.message));
+
+  panel.append(title, message, button, feedback);
+  return panel;
+}
+
 function renderProductDetail(container, product) {
   const status = product.availability === "disponivel" ? "Disponível" : "Esgotado";
-  const interestText = product.availability === "esgotado"
-    ? "Registrar interesse em esgotados será uma extensão futura."
-    : "Estoque real contabilizado por variação.";
+  const isSoldOut = product.availability === "esgotado";
   const availableVariations = product.availableVariations || [];
   const needsVariationSelection = shouldShowVariationSelector(product);
   let selectedVariation = needsVariationSelection ? null : availableVariations[0] || null;
@@ -265,7 +376,7 @@ function renderProductDetail(container, product) {
 
   const extensionNote = document.createElement("p");
   extensionNote.className = "extension-note";
-  extensionNote.textContent = interestText;
+  extensionNote.textContent = "Estoque real contabilizado por variação.";
 
   const cartButton = document.createElement("button");
   cartButton.className = "button primary product-cart-button";
@@ -298,8 +409,12 @@ function renderProductDetail(container, product) {
 
   statusRow.append(availability, stock);
   info.append(brand, title, description, price, statusRow);
-  if (variationSelector) info.append(variationSelector);
-  info.append(cartButton, attributes, extensionNote);
+  if (!isSoldOut && variationSelector) info.append(variationSelector);
+  if (isSoldOut) {
+    info.append(createSoldOutInterestPanel(product), attributes);
+  } else {
+    info.append(cartButton, attributes, extensionNote);
+  }
   showcase.append(visual, info);
   container.replaceChildren(showcase);
 }

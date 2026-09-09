@@ -19,6 +19,7 @@ function showLoginNotice() {
   const messages = {
     carrinho: "Para comprar e montar seu carrinho, entre ou crie sua conta no IAGO Shopping.",
     pedidos: "Para finalizar e acompanhar seus pedidos, entre ou crie sua conta no IAGO Shopping.",
+    interesse: "Para registrar interesse em um produto esgotado, entre ou crie sua conta no IAGO Shopping.",
   };
   if (!messages[reason]) return;
 
