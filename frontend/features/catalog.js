@@ -9,6 +9,7 @@ import {
 
 const PAGE_SIZE = 8;
 const DEFAULT_FILTERS_COLLAPSED = true;
+const MOBILE_CATALOG_MEDIA = "(max-width: 820px)";
 
 function categoryLabel(categoryId) {
   return CATEGORIES.find((category) => category.id === categoryId)?.label || categoryId;
@@ -114,6 +115,7 @@ export async function initCatalogPage() {
 
   if (!grid || !category || !availability || !brand || !sort || !search || !tabs) return;
 
+  const mobileCatalog = window.matchMedia(MOBILE_CATALOG_MEDIA);
   let currentPage = 1;
   let filtersCollapsed = DEFAULT_FILTERS_COLLAPSED;
   const savedContext = readCatalogContext();
@@ -177,6 +179,12 @@ export async function initCatalogPage() {
     }));
   }
 
+  function shouldUseFullPageGrid(itemsLength) {
+    if (itemsLength <= 0) return false;
+    if (!filtersCollapsed) return itemsLength === PAGE_SIZE;
+    return !mobileCatalog.matches;
+  }
+
   buildTabs(tabs, (categoryId) => {
     category.value = categoryId;
     currentPage = 1;
@@ -200,10 +208,7 @@ export async function initCatalogPage() {
 
     const pagination = paginateProducts(filtered, currentPage);
     currentPage = pagination.currentPage;
-    grid.classList.toggle(
-      "is-full-page",
-      filtersCollapsed ? pagination.items.length > 0 : pagination.items.length === PAGE_SIZE
-    );
+    grid.classList.toggle("is-full-page", shouldUseFullPageGrid(pagination.items.length));
     persistCatalogState(filtered.map((product) => product.id));
 
     grid.replaceChildren(...pagination.items.map((product) => (
