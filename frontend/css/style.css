@@ -1902,6 +1902,19 @@ textarea {
     height: 168px;
   }
 
+  .product-grid .product-card .product-meta {
+    align-items: flex-start;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 3px;
+  }
+
+  .product-grid .product-card .product-meta strong,
+  .product-grid .product-card .product-meta span {
+    width: 100%;
+    white-space: nowrap;
+  }
+
   .onboarding-card {
     width: 100%;
     max-width: 100%;
