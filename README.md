@@ -109,24 +109,24 @@ Ela é aplicada somente em marca, títulos curtos, botões, eyebrows e tabs. Par
 
 `.env.example` contém apenas exemplos não sensíveis. Segredos reais devem ficar em `.env`, que está no `.gitignore`.
 
-## Produção Web-04
+## Produção WEB-05
 
-O frontend público continua em `https://ia-go.api.br` via GitHub Pages. Quando executado nesse domínio, o frontend usa a API pública centralizada em:
-
-```text
-https://api.ia-go.api.br
-```
-
-Os endpoints de pagamento ficam derivados dessa base:
+O frontend público continua em `https://ia-go.api.br` via GitHub Pages. A partir da WEB-05, o fluxo web de pagamento Mercado Pago não depende mais de FastAPI público: o navegador chama Supabase Edge Functions usando a configuração pública do Supabase e o JWT do usuário autenticado.
 
 ```text
-https://api.ia-go.api.br/api/payments/engine
-https://api.ia-go.api.br/api/payments/create
-https://api.ia-go.api.br/api/payments/sync
-https://api.ia-go.api.br/api/payments/cancel
+https://ualnmcvgddofqvijzfjt.supabase.co/functions/v1/payment-engine
+https://ualnmcvgddofqvijzfjt.supabase.co/functions/v1/payment-create
+https://ualnmcvgddofqvijzfjt.supabase.co/functions/v1/payment-sync
+https://ualnmcvgddofqvijzfjt.supabase.co/functions/v1/payment-cancel
 ```
 
-Para hospedar o backend em qualquer serviço Python/ASGI compatível, use:
+O webhook de produção esperado no Mercado Pago passa a ser:
+
+```text
+https://ualnmcvgddofqvijzfjt.supabase.co/functions/v1/mercado-pago-webhook
+```
+
+O FastAPI permanece no repositório como referência funcional da migração e compatibilidade local. Para rodar o backend local opcional:
 
 ```bash
 uvicorn backend.main:app --host 0.0.0.0 --port $PORT
@@ -144,7 +144,7 @@ PAYMENT_PROVIDER=mercado_pago_prod
 MERCADO_PAGO_PUBLIC_KEY=
 MERCADO_PAGO_ACCESS_TOKEN=
 MERCADO_PAGO_WEBHOOK_SECRET=
-MERCADO_PAGO_NOTIFICATION_URL=https://api.ia-go.api.br/api/payments/webhooks/mercado-pago
+MERCADO_PAGO_NOTIFICATION_URL=https://ualnmcvgddofqvijzfjt.supabase.co/functions/v1/mercado-pago-webhook
 MERCADO_PAGO_PAYMENT_EXPIRATION_MINUTES=30
 MERCADO_PAGO_POLL_INTERVAL_MS=3000
 ```
@@ -152,8 +152,10 @@ MERCADO_PAGO_POLL_INTERVAL_MS=3000
 Não coloque `SUPABASE_SERVICE_ROLE_KEY`, `MERCADO_PAGO_ACCESS_TOKEN` nem `MERCADO_PAGO_WEBHOOK_SECRET` no frontend. O webhook de produção esperado no Mercado Pago é:
 
 ```text
-https://api.ia-go.api.br/api/payments/webhooks/mercado-pago
+https://ualnmcvgddofqvijzfjt.supabase.co/functions/v1/mercado-pago-webhook
 ```
+
+Detalhes de deploy, secrets e checklist operacional estão em `Documentos/WEB05_SUPABASE_EDGE_FUNCTIONS_MERCADO_PAGO.md`.
 
 ## Preparação Fase 1
 

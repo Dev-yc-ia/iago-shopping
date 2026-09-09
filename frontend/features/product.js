@@ -3,6 +3,7 @@ import { recordEvent } from "../utils/analytics.js";
 import { formatCurrency } from "../utils/format.js";
 import { createProductImage, setProductImage } from "../ui/productImage.js";
 import { addProductToCart } from "./cart.js";
+import { readCatalogContext, resolveAdjacentProductIds } from "./catalogState.js";
 
 function getProductId(products) {
   return new URLSearchParams(window.location.search).get("id") || products[0]?.id || "";
@@ -45,6 +46,46 @@ function renderNotFound(container) {
 
   panel.append(title, message);
   container.replaceChildren(panel);
+}
+
+function productDetailUrl(productId) {
+  return `/produto/?id=${encodeURIComponent(productId)}`;
+}
+
+function createProductNavigationControl(productId, label, direction) {
+  if (!productId) {
+    const button = document.createElement("button");
+    button.className = "button secondary";
+    button.type = "button";
+    button.disabled = true;
+    button.textContent = label;
+    return button;
+  }
+
+  const link = document.createElement("a");
+  link.className = "button secondary";
+  link.href = productDetailUrl(productId);
+  link.rel = direction;
+  link.textContent = label;
+  return link;
+}
+
+function resolveProductSequence(products, currentProductId) {
+  const savedContext = readCatalogContext();
+  const savedIds = savedContext?.productIds || [];
+  const defaultIds = products.map((product) => product.id);
+  const sequenceIds = savedIds.includes(currentProductId) ? savedIds : defaultIds;
+
+  return resolveAdjacentProductIds(sequenceIds, currentProductId);
+}
+
+function renderProductNavigation(sequence) {
+  const container = document.querySelector("#product-sequence-nav");
+  if (!container) return;
+
+  const previous = createProductNavigationControl(sequence.previousId, "Produto anterior", "prev");
+  const next = createProductNavigationControl(sequence.nextId, "Próximo produto", "next");
+  container.replaceChildren(previous, next);
 }
 
 function renderProductGallery(product) {
@@ -217,5 +258,6 @@ export async function initProductPage() {
   }
 
   recordEvent("product_view", { productId: product.id, category: product.category });
+  renderProductNavigation(resolveProductSequence(products, product.id));
   renderProductDetail(container, product);
 }

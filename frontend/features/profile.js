@@ -2,6 +2,8 @@ import {
   getSupabaseClient,
   googleAvatarUrlFromSession,
   googleDisplayNameFromSession,
+  initAuthNavigation,
+  invalidateAuthNavigationCache,
 } from "./auth.js";
 
 const AVATAR_BUCKET = "shopping-avatars";
@@ -268,6 +270,10 @@ async function saveProfilePage(form, feedback, supabase, session) {
     fillProfileForm(form, profile, session);
     fillAddressForm(form, address);
     await renderCurrentAvatar(supabase, document.querySelector("[data-profile-avatar-preview]"), profile, session);
+    if (uploadedAvatarPath || pendingAvatarRemoval || oldAvatarPath !== currentAvatarPath) {
+      invalidateAuthNavigationCache();
+      await initAuthNavigation();
+    }
     setFeedback(feedback, "Dados pessoais salvos com sucesso.", "success");
   } catch (error) {
     if (uploadedAvatarPath) await removeAvatar(supabase, uploadedAvatarPath);

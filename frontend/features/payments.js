@@ -32,8 +32,8 @@ function normalizePayment(data) {
   return Array.isArray(data) ? data[0] : data;
 }
 
-function responseErrorMessage(data) {
-  if (!data?.detail) return "Payment Engine indisponível.";
+function responseErrorMessage(data, fallback = "Payment Engine indisponível.") {
+  if (!data?.detail) return data?.message || fallback;
   if (typeof data.detail === "string") return data.detail;
   if (Array.isArray(data.detail)) {
     return data.detail
@@ -54,33 +54,41 @@ export function isMercadoPagoEngine(paymentEngine) {
   return paymentEngine?.provider === "mercado_pago";
 }
 
-async function apiPaymentRequest(endpoint, payload) {
+async function edgeFunctionErrorMessage(error) {
+  const response = error?.context;
+  if (response?.json) {
+    const data = await response.json().catch(() => null);
+    if (data) return responseErrorMessage(data, error.message);
+  }
+  if (response?.text) {
+    const text = await response.text().catch(() => "");
+    if (text) return text;
+  }
+  return error?.message || "Payment Engine indisponível.";
+}
+
+async function edgePaymentRequest(functionName, payload) {
   const session = await getCurrentSession();
   if (!session?.access_token) {
     throw new Error("Faça login para iniciar o pagamento.");
   }
 
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      Authorization: `Bearer ${session.access_token}`,
-    },
-    body: JSON.stringify(payload),
+  const supabase = await getSupabaseClient();
+  const { data, error } = await supabase.functions.invoke(functionName, {
+    body: payload,
   });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(responseErrorMessage(data));
+  if (error) {
+    throw new Error(await edgeFunctionErrorMessage(error));
   }
   return data;
 }
 
 export async function getPaymentEngineMetadata() {
   try {
-    const response = await fetch(APP_CONFIG.paymentEngineEndpoint);
-    if (!response.ok) throw new Error("Payment Engine indisponível.");
-    return response.json();
+    const supabase = await getSupabaseClient();
+    const { data, error } = await supabase.functions.invoke(APP_CONFIG.paymentEngineEndpoint);
+    if (error) throw new Error(await edgeFunctionErrorMessage(error));
+    return data;
   } catch (error) {
     console.warn(error.message);
     return {
@@ -126,7 +134,7 @@ export async function cancelPaymentAttempt(order, paymentEngine = null) {
   }
 
   if (isMercadoPagoEngine(paymentEngine)) {
-    const data = await apiPaymentRequest(APP_CONFIG.paymentCancelEndpoint, {
+    const data = await edgePaymentRequest(APP_CONFIG.paymentCancelEndpoint, {
       payment_id: order.paymentId,
       provider_payment_id: order.paymentProviderPaymentId || null,
     });
@@ -151,7 +159,7 @@ export async function cancelPaymentAttempt(order, paymentEngine = null) {
 }
 
 export async function createMercadoPagoPayment(orderId, method = "pix", cardPayload = null) {
-  const data = await apiPaymentRequest(APP_CONFIG.paymentCreateEndpoint, {
+  const data = await edgePaymentRequest(APP_CONFIG.paymentCreateEndpoint, {
     order_id: orderId,
     method,
     card_payload: cardPayload,
@@ -176,7 +184,7 @@ export async function createMercadoPagoPayment(orderId, method = "pix", cardPayl
 }
 
 export async function syncMercadoPagoPayment(payment) {
-  const data = await apiPaymentRequest(APP_CONFIG.paymentSyncEndpoint, {
+  const data = await edgePaymentRequest(APP_CONFIG.paymentSyncEndpoint, {
     payment_id: payment.id,
     provider_payment_id: payment.provider_payment_id || payment.providerPaymentId,
   });

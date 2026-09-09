@@ -79,6 +79,8 @@ export function mountUserMenu(nav, { profile, session, avatarUrl, onSignOut }) {
   if (avatarUrl) {
     const image = document.createElement("img");
     image.className = "user-avatar-image";
+    image.decoding = "sync";
+    image.loading = "eager";
     image.src = avatarUrl;
     image.alt = "";
     image.addEventListener("error", () => {

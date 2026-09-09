@@ -1,0 +1,16 @@
+project_id = "iago-shopping"
+
+[functions.payment-engine]
+verify_jwt = false
+
+[functions.payment-create]
+verify_jwt = true
+
+[functions.payment-sync]
+verify_jwt = true
+
+[functions.payment-cancel]
+verify_jwt = true
+
+[functions.mercado-pago-webhook]
+verify_jwt = false

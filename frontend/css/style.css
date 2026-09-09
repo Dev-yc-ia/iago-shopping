@@ -483,6 +483,10 @@ textarea {
   gap: 18px;
 }
 
+.catalog-layout.filters-collapsed {
+  grid-template-columns: 48px minmax(0, 1fr);
+}
+
 .filters-panel,
 .admin-card,
 .notice-panel {
@@ -497,6 +501,44 @@ textarea {
   padding: 18px;
   display: grid;
   gap: 10px;
+}
+
+.filters-panel-head,
+.filters-panel-body {
+  display: grid;
+  gap: 10px;
+}
+
+.filters-panel-head {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.filters-panel-head strong {
+  color: var(--text-primary);
+  font-family: var(--font-brand);
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.filters-toggle {
+  min-width: 34px;
+  padding-inline: 6px;
+}
+
+.filters-panel.is-collapsed {
+  padding: 10px 4px;
+}
+
+.filters-panel.is-collapsed .filters-panel-head {
+  grid-template-columns: 1fr;
+  justify-items: center;
+}
+
+.filters-panel.is-collapsed .filters-panel-head strong,
+.filters-panel.is-collapsed .filters-panel-body {
+  display: none;
 }
 
 .product-form {
@@ -671,6 +713,18 @@ textarea {
   justify-content: stretch;
 }
 
+.catalog-layout.filters-collapsed .product-grid.is-full-page {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.catalog-layout.filters-collapsed .product-grid.is-full-page .product-card {
+  min-height: 360px;
+}
+
+.catalog-layout.filters-collapsed .product-grid.is-full-page .product-image--catalog {
+  height: clamp(190px, 16vw, 220px);
+}
+
 .product-card {
   height: 100%;
   width: 100%;
@@ -800,6 +854,25 @@ textarea {
   margin-bottom: 18px;
   color: var(--accent);
   font-weight: 850;
+}
+
+.product-nav-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.product-nav-bar .back-link {
+  margin-bottom: 0;
+}
+
+.product-sequence-nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
 .product-showcase {
@@ -1592,6 +1665,28 @@ textarea {
   .profile-avatar-editor,
   .profile-form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .catalog-layout.filters-collapsed {
+    grid-template-columns: 1fr;
+  }
+
+  .filters-panel.is-collapsed {
+    width: fit-content;
+    padding: 10px;
+  }
+
+  .product-nav-bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .product-sequence-nav {
+    justify-content: stretch;
+  }
+
+  .product-sequence-nav .button {
+    flex: 1 1 150px;
   }
 
   .profile-form-grid textarea {

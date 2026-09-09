@@ -27,43 +27,45 @@
       <section class="catalog-section" id="catalogo" aria-labelledby="catalog-title">
         <div class="section-head">
           <div>
-            <span class="eyebrow">Catálogo comercial</span>
-            <h1 id="catalog-title">Produtos publicados por categoria</h1>
-          </div>
-          <p>Produtos publicados com estoque real por variação.</p>
-        </div>
+            <h1 id="catalog-title">Catálogo comercial</h1>
 
         <div class="catalog-layout">
           <aside class="filters-panel" aria-label="Filtros do catálogo">
-            <label for="search-products">Buscar</label>
-            <input id="search-products" type="search" placeholder="Nome, marca ou atributo">
+            <div class="filters-panel-head">
+              <strong>Filtros</strong>
+              <button class="button ghost filters-toggle" type="button" id="toggle-filters" aria-controls="filters-panel-body" aria-expanded="true" aria-label="Recolher filtros do catálogo">&lt;&lt;&lt;</button>
+            </div>
 
-            <label for="category-filter">Categoria</label>
-            <select id="category-filter"></select>
+            <div class="filters-panel-body" id="filters-panel-body">
+              <label for="search-products">Buscar</label>
+              <input id="search-products" type="search" placeholder="Nome, marca ou atributo">
 
-            <label for="availability-filter">Disponibilidade</label>
-            <select id="availability-filter">
-              <option value="todos">Todos</option>
-              <option value="disponivel">Disponível</option>
-              <option value="esgotado">Esgotado</option>
-            </select>
+              <label for="category-filter">Categoria</label>
+              <select id="category-filter"></select>
 
-            <label for="brand-filter">Marca</label>
-            <select id="brand-filter"></select>
+              <label for="availability-filter">Disponibilidade</label>
+              <select id="availability-filter">
+                <option value="todos">Todos</option>
+                <option value="disponivel">Disponível</option>
+                <option value="esgotado">Esgotado</option>
+              </select>
 
-            <label for="sort-products">Ordenar</label>
-            <select id="sort-products">
-              <option value="relevancia">Relevância</option>
-              <option value="menor-preco">Menor preço</option>
-              <option value="maior-preco">Maior preço</option>
-              <option value="nome">Nome</option>
-            </select>
+              <label for="brand-filter">Marca</label>
+              <select id="brand-filter"></select>
+
+              <label for="sort-products">Ordenar</label>
+              <select id="sort-products">
+                <option value="relevancia">Relevância</option>
+                <option value="menor-preco">Menor preço</option>
+                <option value="maior-preco">Maior preço</option>
+                <option value="nome">Nome</option>
+              </select>
+            </div>
           </aside>
 
           <div>
             <div class="catalog-toolbar">
               <span id="catalog-count">Carregando catálogo</span>
-              <span id="catalog-source">Fonte Supabase</span>
             </div>
             <div class="category-tabs" id="category-tabs" aria-label="Categorias"></div>
             <div class="product-grid" id="product-grid"></div>

@@ -3,8 +3,12 @@ import { mountUserMenu, unmountUserMenu } from "../ui/userMenu.js";
 import { recordEvent } from "../utils/analytics.js";
 
 let supabaseClientPromise;
+let lastAuthNavigationSignature = "";
+let authNavigationSubscription = null;
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 const AVATAR_BUCKET = "shopping-avatars";
+const AUTH_NAVIGATION_CACHE_KEY = "iago-shopping-auth-navigation-state";
+const AVATAR_SIGNED_URL_TTL_SECONDS = 7 * 24 * 60 * 60;
 const GOOGLE_METADATA_AVATAR_KEYS = ["avatar_url", "picture"];
 const GOOGLE_METADATA_NAME_KEYS = ["full_name", "name", "nome_exibicao"];
 
@@ -310,6 +314,8 @@ export async function signInWithGoogle(redirectPath = "/login/") {
 }
 
 export async function signOut() {
+  clearAuthNavigationCache();
+  lastAuthNavigationSignature = "";
   const supabase = await getSupabaseClient();
   const { error } = await supabase.auth.signOut();
   if (error) throw error;
@@ -369,23 +375,46 @@ export function canAccessAdmin(profile) {
 }
 
 async function resolveAvatarUrl(supabase, avatarPath) {
-  if (!avatarPath) return "";
+  if (!avatarPath) return { url: "", expiresAt: 0 };
 
   const { data, error } = await supabase.storage
     .from(AVATAR_BUCKET)
-    .createSignedUrl(avatarPath, 60 * 60);
+    .createSignedUrl(avatarPath, AVATAR_SIGNED_URL_TTL_SECONDS);
 
   if (error) {
     console.warn(error.message);
-    return "";
+    return { url: "", expiresAt: 0 };
   }
 
-  return data?.signedUrl || "";
+  return {
+    url: data?.signedUrl || "",
+    expiresAt: data?.signedUrl ? Date.now() + (AVATAR_SIGNED_URL_TTL_SECONDS * 1000) : 0,
+  };
 }
 
-async function resolveUserAvatarUrl(supabase, profile, session) {
-  const storedAvatarUrl = await resolveAvatarUrl(supabase, profile?.avatar_path);
-  return storedAvatarUrl || googleAvatarUrlFromSession(session);
+function canReuseCachedAvatarUrl(state, profile, session) {
+  if (state?.status !== "authenticated" || !state.avatarUrl) return false;
+  return state.userId === (session?.user?.id || "")
+    && state.avatarPath === (profile?.avatar_path || "")
+    && state.googleAvatarUrl === googleAvatarUrlFromSession(session);
+}
+
+async function resolveUserAvatarUrl(supabase, profile, session, previousState) {
+  const googleAvatarUrl = googleAvatarUrlFromSession(session);
+  if (!profile?.avatar_path) return { avatarUrl: googleAvatarUrl, expiresAt: 0 };
+
+  if (canReuseCachedAvatarUrl(previousState, profile, session)) {
+    return {
+      avatarUrl: previousState.avatarUrl,
+      expiresAt: previousState.expiresAt || 0,
+    };
+  }
+
+  const storedAvatar = await resolveAvatarUrl(supabase, profile.avatar_path);
+  return {
+    avatarUrl: storedAvatar.url || googleAvatarUrl,
+    expiresAt: storedAvatar.expiresAt,
+  };
 }
 
 function normalizeLoginLinks(nav) {
@@ -410,6 +439,116 @@ function resetDynamicNavigation(nav) {
   nav.querySelector("[data-user-menu-root]")?.remove();
 }
 
+function safeSessionStorage() {
+  try {
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
+function profileDisplayName(profile, session) {
+  return profile?.nome_completo
+    || profile?.nome_exibicao
+    || googleDisplayNameFromSession(session)
+    || session?.user?.email
+    || "";
+}
+
+function makeAuthNavigationState(session, profile, avatarUrl = "", avatarExpiresAt = 0) {
+  if (!session?.user) {
+    return { version: 1, status: "guest" };
+  }
+
+  return {
+    version: 1,
+    status: "authenticated",
+    userId: session.user.id || "",
+    email: session.user.email || "",
+    displayName: profileDisplayName(profile, session),
+    papel: profile?.papel || "",
+    statusAtivacao: profile?.status_ativacao || "",
+    avatarPath: profile?.avatar_path || "",
+    googleAvatarUrl: googleAvatarUrlFromSession(session),
+    avatarUrl,
+    expiresAt: avatarExpiresAt,
+  };
+}
+
+function authNavigationSignature(state) {
+  if (state?.status !== "authenticated") return "guest";
+  return JSON.stringify({
+    status: state.status,
+    userId: state.userId,
+    email: state.email,
+    displayName: state.displayName,
+    papel: state.papel,
+    statusAtivacao: state.statusAtivacao,
+    avatarPath: state.avatarPath,
+    googleAvatarUrl: state.googleAvatarUrl,
+  });
+}
+
+function cachedSessionFromState(state) {
+  return {
+    user: {
+      id: state.userId,
+      email: state.email,
+      user_metadata: {
+        full_name: state.displayName,
+        picture: state.googleAvatarUrl || "",
+      },
+    },
+  };
+}
+
+function cachedProfileFromState(state) {
+  return {
+    nome_completo: state.displayName,
+    nome_exibicao: state.displayName,
+    papel: state.papel,
+    status_ativacao: state.statusAtivacao,
+    avatar_path: state.avatarPath,
+  };
+}
+
+function readAuthNavigationCache() {
+  const storage = safeSessionStorage();
+  if (!storage) return null;
+
+  try {
+    const state = JSON.parse(storage.getItem(AUTH_NAVIGATION_CACHE_KEY) || "null");
+    if (state?.version !== 1 || state.status !== "authenticated") return null;
+    return state;
+  } catch {
+    return null;
+  }
+}
+
+function writeAuthNavigationCache(state) {
+  const storage = safeSessionStorage();
+  if (!storage) return;
+
+  try {
+    if (state?.status === "authenticated") {
+      storage.setItem(AUTH_NAVIGATION_CACHE_KEY, JSON.stringify(state));
+      return;
+    }
+    storage.removeItem(AUTH_NAVIGATION_CACHE_KEY);
+  } catch {
+    // Cache visual temporário; falhas não devem impedir autenticação.
+  }
+}
+
+function clearAuthNavigationCache() {
+  writeAuthNavigationCache({ version: 1, status: "guest" });
+}
+
+export function invalidateAuthNavigationCache() {
+  clearAuthNavigationCache();
+  lastAuthNavigationSignature = "";
+}
+
 function appendAuthenticatedLink(nav, href, label, datasetKey) {
   const link = document.createElement("a");
   link.href = href;
@@ -417,6 +556,58 @@ function appendAuthenticatedLink(nav, href, label, datasetKey) {
   link.dataset.authDynamic = "true";
   link.dataset[datasetKey] = "true";
   nav.append(link);
+}
+
+function renderAuthNavigationState(nav, loginLinks, adminLink, state) {
+  const signature = authNavigationSignature(state);
+  if (signature === lastAuthNavigationSignature) {
+    writeAuthNavigationCache(state);
+    return;
+  }
+
+  resetDynamicNavigation(nav);
+  lastAuthNavigationSignature = signature;
+
+  if (state.status !== "authenticated") {
+    loginLinks.forEach((link) => {
+      link.hidden = false;
+    });
+    if (adminLink) adminLink.hidden = true;
+    clearAuthNavigationCache();
+    return;
+  }
+
+  const profile = cachedProfileFromState(state);
+  const session = cachedSessionFromState(state);
+  loginLinks.forEach((link) => {
+    link.hidden = true;
+  });
+  if (adminLink) {
+    adminLink.hidden = !canAccessAdmin(profile);
+  }
+
+  appendAuthenticatedLink(nav, "/pedidos/", "Pedidos", "ordersLink");
+  appendAuthenticatedLink(nav, "/carrinho/", "Carrinho", "cartLink");
+  mountUserMenu(nav, {
+    profile,
+    session,
+    avatarUrl: state.avatarUrl || state.googleAvatarUrl || "",
+    onSignOut: async () => {
+      await signOut();
+      window.location.href = "/login/";
+    },
+  });
+  writeAuthNavigationCache(state);
+}
+
+async function resolveAuthNavigationState(sessionOverride, previousState = readAuthNavigationCache()) {
+  const supabase = await getSupabaseClient();
+  const session = sessionOverride === undefined ? await getSession() : sessionOverride;
+  if (!session?.user) return makeAuthNavigationState(null, null);
+
+  const profile = await syncGoogleProfileIfNeeded(supabase, session, await getOwnProfile(supabase));
+  const avatar = await resolveUserAvatarUrl(supabase, profile, session, previousState);
+  return makeAuthNavigationState(session, profile, avatar.avatarUrl, avatar.expiresAt);
 }
 
 export async function requireAdminAccess() {
@@ -433,44 +624,29 @@ export async function initAuthNavigation() {
   const nav = document.querySelector(".top-nav");
   if (!nav) return;
 
-  resetDynamicNavigation(nav);
   const loginLinks = normalizeLoginLinks(nav);
   const adminLink = nav.querySelector('a[href$="/admin/"]');
   if (adminLink) {
     adminLink.hidden = true;
   }
 
+  const cachedState = readAuthNavigationCache();
+  if (cachedState) {
+    renderAuthNavigationState(nav, loginLinks, adminLink, cachedState);
+  }
+
   try {
-    const { session, profile } = await recoverSessionProfile();
-    if (adminLink) {
-      adminLink.hidden = !canAccessAdmin(profile);
-    }
-
-    if (!session) {
-      loginLinks.forEach((link) => {
-        link.hidden = false;
-      });
-      return;
-    }
-
-    loginLinks.forEach((link) => {
-      link.hidden = true;
-    });
-
-    appendAuthenticatedLink(nav, "/pedidos/", "Pedidos", "ordersLink");
-    appendAuthenticatedLink(nav, "/carrinho/", "Carrinho", "cartLink");
+    renderAuthNavigationState(nav, loginLinks, adminLink, await resolveAuthNavigationState(undefined, cachedState));
 
     const supabase = await getSupabaseClient();
-    const avatarUrl = await resolveUserAvatarUrl(supabase, profile, session);
-    mountUserMenu(nav, {
-      profile,
-      session,
-      avatarUrl,
-      onSignOut: async () => {
-        await signOut();
-        window.location.href = "/login/";
-      },
+    authNavigationSubscription?.unsubscribe();
+    const { data } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "INITIAL_SESSION") return;
+      resolveAuthNavigationState(session, readAuthNavigationCache())
+        .then((state) => renderAuthNavigationState(nav, loginLinks, adminLink, state))
+        .catch((error) => console.warn(error.message));
     });
+    authNavigationSubscription = data?.subscription || null;
   } catch (error) {
     console.warn(error.message);
   }

@@ -1,8 +1,14 @@
 import { CATALOG_SOURCE, CATEGORIES, getCatalogProducts } from "../config/products.js";
 import { createProductCard } from "../ui/productCard.js";
 import { normalizeText } from "../utils/format.js";
+import {
+  readCatalogContext,
+  saveCatalogContext,
+  serializeCatalogContext,
+} from "./catalogState.js";
 
 const PAGE_SIZE = 8;
+const DEFAULT_FILTERS_COLLAPSED = true;
 
 function categoryLabel(categoryId) {
   return CATEGORIES.find((category) => category.id === categoryId)?.label || categoryId;
@@ -89,6 +95,9 @@ function paginateProducts(products, page) {
 }
 
 export async function initCatalogPage() {
+  const catalogLayout = document.querySelector(".catalog-layout");
+  const filterPanel = document.querySelector(".filters-panel");
+  const filterToggle = document.querySelector("#toggle-filters");
   const grid = document.querySelector("#product-grid");
   const empty = document.querySelector("#empty-state");
   const search = document.querySelector("#search-products");
@@ -106,10 +115,68 @@ export async function initCatalogPage() {
   if (!grid || !category || !availability || !brand || !sort || !search || !tabs) return;
 
   let currentPage = 1;
+  let filtersCollapsed = DEFAULT_FILTERS_COLLAPSED;
+  const savedContext = readCatalogContext();
   const products = await getCatalogProducts();
 
   buildOptions(category);
   buildBrandOptions(brand, products);
+
+  function currentFilters() {
+    return {
+      search: search.value,
+      category: category.value,
+      availability: availability.value,
+      brand: brand.value,
+      sort: sort.value,
+    };
+  }
+
+  function setExistingSelectValue(select, value, fallback = "todos") {
+    const hasOption = Array.from(select.options).some((option) => option.value === value);
+    select.value = hasOption ? value : fallback;
+  }
+
+  function applyFilterPanelState() {
+    catalogLayout?.classList.toggle("filters-collapsed", filtersCollapsed);
+    filterPanel?.classList.toggle("is-collapsed", filtersCollapsed);
+
+    if (filterToggle) {
+      filterToggle.textContent = filtersCollapsed ? ">>>" : "<<<";
+      filterToggle.setAttribute(
+        "aria-label",
+        filtersCollapsed ? "Expandir filtros do catálogo" : "Recolher filtros do catálogo"
+      );
+      filterToggle.setAttribute("aria-expanded", String(!filtersCollapsed));
+    }
+  }
+
+  function restoreCatalogState() {
+    if (!savedContext) {
+      applyFilterPanelState();
+      return;
+    }
+
+    const filters = savedContext.filters;
+    search.value = filters.search;
+    setExistingSelectValue(category, filters.category);
+    setExistingSelectValue(availability, filters.availability);
+    setExistingSelectValue(brand, filters.brand);
+    setExistingSelectValue(sort, filters.sort, "relevancia");
+    currentPage = savedContext.page;
+    filtersCollapsed = savedContext.filterCollapsed;
+    applyFilterPanelState();
+  }
+
+  function persistCatalogState(productIds) {
+    saveCatalogContext(serializeCatalogContext({
+      filters: currentFilters(),
+      page: currentPage,
+      filterCollapsed: filtersCollapsed,
+      productIds,
+    }));
+  }
+
   buildTabs(tabs, (categoryId) => {
     category.value = categoryId;
     currentPage = 1;
@@ -133,7 +200,11 @@ export async function initCatalogPage() {
 
     const pagination = paginateProducts(filtered, currentPage);
     currentPage = pagination.currentPage;
-    grid.classList.toggle("is-full-page", pagination.items.length === PAGE_SIZE);
+    grid.classList.toggle(
+      "is-full-page",
+      filtersCollapsed ? pagination.items.length > 0 : pagination.items.length === PAGE_SIZE
+    );
+    persistCatalogState(filtered.map((product) => product.id));
 
     grid.replaceChildren(...pagination.items.map((product) => (
       createProductCard(product, categoryLabel(product.category))
@@ -181,5 +252,12 @@ export async function initCatalogPage() {
     render();
   });
 
+  filterToggle?.addEventListener("click", () => {
+    filtersCollapsed = !filtersCollapsed;
+    applyFilterPanelState();
+    render();
+  });
+
+  restoreCatalogState();
   render();
 }

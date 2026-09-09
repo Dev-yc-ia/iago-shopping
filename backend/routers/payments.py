@@ -32,6 +32,8 @@ except Exception:
     WebhookSignatureValidator = None
 
 
+# Mantido como referência funcional e compatibilidade local.
+# Na WEB-05, o checkout web de produção usa Supabase Edge Functions.
 router = APIRouter(prefix="/api/payments", tags=["payments"])
 logger = logging.getLogger("iago.shopping.payments")
 
