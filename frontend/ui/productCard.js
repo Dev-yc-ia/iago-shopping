@@ -4,6 +4,7 @@ import { createProductImage } from "./productImage.js";
 export function createProductCard(product, categoryLabel) {
   const status = product.availability === "disponivel" ? "Disponível" : "Esgotado";
   const disabledClass = product.availability === "esgotado" ? " is-muted" : "";
+  const totalStockLabel = product.stock > 0 ? `${product.stock} un.` : status;
 
   const card = document.createElement("article");
   card.className = `product-card${disabledClass}`;
@@ -35,7 +36,7 @@ export function createProductCard(product, categoryLabel) {
   price.textContent = formatCurrency(product.price);
 
   const availability = document.createElement("span");
-  availability.textContent = product.stock > 0 ? `${product.stock} un.` : status;
+  availability.textContent = totalStockLabel;
 
   const detailLink = document.createElement("a");
   detailLink.className = "card-link";
@@ -47,8 +48,18 @@ export function createProductCard(product, categoryLabel) {
   const availableVariations = product.availableVariations || [];
   if (availableVariations.length > 1 || availableVariations.some((variation) => variation.name !== "Padrao")) {
     variationList.replaceChildren(...availableVariations.slice(0, 6).map((variation) => {
-      const chip = document.createElement("span");
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "catalog-variation-option";
       chip.textContent = variation.name;
+      chip.setAttribute("aria-label", `${variation.name}: ${variation.stock} unidade${variation.stock === 1 ? "" : "s"} em estoque`);
+      chip.addEventListener("click", () => {
+        variationList.querySelectorAll(".catalog-variation-option").forEach((item) => {
+          item.classList.toggle("is-selected", item === chip);
+          item.setAttribute("aria-pressed", String(item === chip));
+        });
+        availability.textContent = `${variation.stock} un.`;
+      });
       return chip;
     }));
   }

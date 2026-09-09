@@ -69,6 +69,8 @@ def test_web07_frontend_removes_manual_sku_and_adds_variation_controls():
         "variationTotal",
         "availableVariations",
         "product-variation-chips",
+        "catalog-variation-option",
+        "availability.textContent = `${variation.stock} un.`",
         "product-variation-selector",
         "Selecione um tamanho",
         "addProductToCart(product.id, 1, selectedVariation?.id || null)",
@@ -78,3 +80,4 @@ def test_web07_frontend_removes_manual_sku_and_adds_variation_controls():
         assert fragment in html + admin + product + card + css + products
 
     assert 'id="product-sku" name="sku" type="text"' not in html
+    assert ".product-card:hover .product-variation-chips" not in css

@@ -875,7 +875,7 @@ textarea {
   margin: 2px 0 12px;
 }
 
-.product-variation-chips span,
+.catalog-variation-option,
 .variation-option {
   min-width: 38px;
   min-height: 30px;
@@ -890,8 +890,13 @@ textarea {
   font-weight: 850;
 }
 
-.product-card:hover .product-variation-chips span,
-.product-card:focus-within .product-variation-chips span,
+.catalog-variation-option {
+  cursor: pointer;
+}
+
+.catalog-variation-option:hover,
+.catalog-variation-option:focus-visible,
+.catalog-variation-option.is-selected,
 .variation-option.is-selected {
   border-color: var(--accent);
   color: var(--text-primary);
