@@ -96,6 +96,7 @@ def test_web10_frontend_adds_commercial_product_fields_and_role_aware_admin():
         "Repasse ao parceiro não pode ser maior que o preço final.",
         "profile.papel === \"master\"",
         "role === \"parceiro\"",
+        "shopping_parceiro_reconciliar_pedidos_pagos_legados",
         "shopping_parceiro_listar_pedidos",
         "shopping_parceiro_confirmar_entrega",
         "Confirmar entrega pessoal",
@@ -121,3 +122,10 @@ def test_web10_frontend_customer_receipt_flow_and_checkout_copy():
         assert fragment in orders + checkout
 
     assert "Pedido confirmado" not in checkout
+
+
+def test_web10_frontend_really_hides_role_restricted_admin_sections():
+    css = read(FRONTEND / "css" / "style.css")
+
+    assert "[hidden]" in css
+    assert "display: none !important;" in css

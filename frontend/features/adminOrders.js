@@ -140,6 +140,9 @@ async function loadAdminOrders() {
 
 async function loadPartnerOrders() {
   const supabase = await getSupabaseClient();
+  const { error: reconcileError } = await supabase.rpc("shopping_parceiro_reconciliar_pedidos_pagos_legados");
+  if (reconcileError) throw reconcileError;
+
   const { data, error } = await supabase.rpc("shopping_parceiro_listar_pedidos");
   if (error) throw error;
   return (data || []).map(normalizePartnerOrder);
