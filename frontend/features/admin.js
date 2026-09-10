@@ -30,6 +30,19 @@ function renderAdminState(profile) {
   document.querySelectorAll("[data-master-only]").forEach((element) => {
     element.hidden = profile.papel !== "master";
   });
+
+  document.querySelectorAll("[data-admin-master-area]").forEach((element) => {
+    element.hidden = profile.papel !== "master";
+  });
+
+  document.querySelectorAll("[data-admin-payments-area]").forEach((element) => {
+    element.hidden = profile.papel === "parceiro";
+  });
+
+  const ordersTitle = document.querySelector("[data-admin-orders-area] h1");
+  const ordersEyebrow = document.querySelector("[data-admin-orders-area] .eyebrow");
+  if (ordersTitle && profile.papel === "parceiro") ordersTitle.textContent = "Meus pedidos";
+  if (ordersEyebrow && profile.papel === "parceiro") ordersEyebrow.textContent = "Parceiro";
 }
 
 function profileTitle(profile) {
@@ -140,8 +153,10 @@ export function initAdminPage() {
 
       const { profile } = authState;
       renderAdminState(profile);
-      initAdminProducts();
-      initAdminOrders({ isMaster: profile.papel === "master" });
+      if (profile.papel === "master") {
+        initAdminProducts();
+      }
+      initAdminOrders({ role: profile.papel, isMaster: profile.papel === "master" });
       if (profile.papel === "master") {
         loadMasterProfiles();
       }

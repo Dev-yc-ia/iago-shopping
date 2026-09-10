@@ -100,7 +100,7 @@ def test_web09_frontend_adds_customer_and_master_cancel_actions():
         "Tem certeza que deseja cancelar este pedido?",
         "Cancelado pelo cliente",
         "order.status !== \"cancelado\" && order.paymentStatus !== \"aprovado\"",
-        "initAdminOrders({ isMaster: profile.papel === \"master\" })",
+        "initAdminOrders({ role: profile.papel, isMaster: profile.papel === \"master\" })",
         "shopping_admin_cancelar_pedido",
         "Motivo do cancelamento:",
         "Informe o motivo para cancelar como master.",

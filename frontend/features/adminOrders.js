@@ -12,12 +12,36 @@ const ORDER_STATUS_LABELS = {
   cancelado: "Cancelado",
 };
 
+const DELIVERY_STATUS_LABELS = {
+  aguardando_parceiro: "Parceiro preparando",
+  enviado: "Envio confirmado",
+  entregue_pessoalmente: "Entrega pessoal confirmada",
+  recebido_cliente: "Recebido pelo cliente",
+  cancelado: "Entrega cancelada",
+};
+
+const PAYOUT_STATUS_LABELS = {
+  bloqueado: "Repasse bloqueado",
+  elegivel: "Repasse elegível",
+  pago: "Repasse pago",
+};
+
 function formatDate(value) {
   if (!value) return "Data não informada";
   return new Intl.DateTimeFormat("pt-BR", {
     dateStyle: "short",
     timeStyle: "short",
   }).format(new Date(value));
+}
+
+function formatDateOnly(value) {
+  if (!value) return "";
+  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short" }).format(new Date(value));
+}
+
+function deliveryWindow(delivery) {
+  if (!delivery?.previsao_inicio || !delivery?.previsao_fim) return "Previsão não informada";
+  return `Previsão entre ${formatDateOnly(delivery.previsao_inicio)} e ${formatDateOnly(delivery.previsao_fim)}`;
 }
 
 function normalizeAdminOrder(order) {
@@ -41,8 +65,44 @@ function normalizeAdminOrder(order) {
     canceledAt: order.cancelado_em || "",
     canceledByType: order.cancelado_por_tipo || "",
     cancellationReason: order.motivo_cancelamento || "",
+    fulfillmentStatus: order.fulfillment_status || "pendente_pagamento",
+    deliveries: Array.isArray(order.entregas) ? order.entregas : [],
     createdAt: order.criado_em,
     items,
+  };
+}
+
+function normalizePartnerOrder(order) {
+  const items = Array.isArray(order.itens) ? order.itens : [];
+  const internalNumber = order.numero;
+  return {
+    deliveryId: order.entrega_id,
+    id: order.pedido_id,
+    internalNumber,
+    number: order.numero_cliente || internalNumber,
+    customerName: order.cliente_nome || "Cliente",
+    customerEmail: order.cliente_email || "E-mail não informado",
+    address: order.endereco_entrega_snapshot || null,
+    paymentStatus: order.pagamento_status || "pendente",
+    deliveryStatus: order.entrega_status || "aguardando_parceiro",
+    fulfillmentMethod: order.metodo_cumprimento || "",
+    payoutStatus: order.repasse_status || "bloqueado",
+    forecastStart: order.previsao_inicio || "",
+    forecastEnd: order.previsao_fim || "",
+    partnerConfirmedAt: order.parceiro_confirmado_em || "",
+    customerConfirmedAt: order.cliente_confirmado_em || "",
+    payoutTotal: Number(order.valor_repasse_total || 0),
+    createdAt: order.criado_em,
+    updatedAt: order.atualizado_em,
+    items: items.map((item) => ({
+      id: item.item_id,
+      variationName: item.variacao_nome || "",
+      sku: item.sku,
+      name: item.nome,
+      brand: item.marca,
+      quantity: Number(item.quantidade || 0),
+      payoutTotal: Number(item.valor_repasse_total_snapshot || 0),
+    })),
   };
 }
 
@@ -78,11 +138,54 @@ async function loadAdminOrders() {
   return (data || []).map(normalizeAdminOrder);
 }
 
+async function loadPartnerOrders() {
+  const supabase = await getSupabaseClient();
+  const { data, error } = await supabase.rpc("shopping_parceiro_listar_pedidos");
+  if (error) throw error;
+  return (data || []).map(normalizePartnerOrder);
+}
+
+async function confirmPartnerDelivery(deliveryId, method) {
+  const supabase = await getSupabaseClient();
+  const { error } = await supabase.rpc("shopping_parceiro_confirmar_entrega", {
+    p_entrega_id: deliveryId,
+    p_metodo: method,
+  });
+  if (error) throw error;
+}
+
 async function loadAdminPayments() {
   const supabase = await getSupabaseClient();
   const { data, error } = await supabase.rpc("shopping_admin_listar_pagamentos");
   if (error) throw error;
   return data || [];
+}
+
+function addressText(address) {
+  if (!address) return "Endereço de entrega não informado no pedido.";
+  const parts = [
+    address.nome_destinatario,
+    [address.logradouro, address.numero].filter(Boolean).join(", "),
+    address.complemento,
+    address.bairro,
+    [address.cidade, address.uf].filter(Boolean).join(" - "),
+    address.cep ? `CEP ${address.cep}` : "",
+    address.referencia,
+  ].filter(Boolean);
+  return parts.join(" | ") || "Endereço de entrega não informado no pedido.";
+}
+
+function renderDeliveryLine(delivery) {
+  const line = document.createElement("p");
+  line.className = "extension-note";
+  line.textContent = [
+    delivery.parceiro_nome || "Parceiro",
+    DELIVERY_STATUS_LABELS[delivery.status] || delivery.status,
+    PAYOUT_STATUS_LABELS[delivery.repasse_status] || delivery.repasse_status,
+    formatCurrency(delivery.valor_repasse_total),
+    deliveryWindow(delivery),
+  ].filter(Boolean).join(" | ");
+  return line;
 }
 
 function renderAdminOrder(order, handlers) {
@@ -120,9 +223,10 @@ function renderAdminOrder(order, handlers) {
   note.className = "extension-note";
   note.textContent = order.status === "cancelado"
     ? `${order.cancellationReason || "Pedido cancelado."}${order.canceledAt ? ` | ${formatDate(order.canceledAt)}` : ""}`
-    : "Pagamento acompanhado pelo Payment Engine.";
+    : `Entrega: ${order.fulfillmentStatus === "concluido" ? "concluída" : "em andamento"}.`;
 
   card.append(status, title, internalRef, customer, date, total, items, payment, note);
+  order.deliveries.forEach((delivery) => card.append(renderDeliveryLine(delivery)));
   if (canCancelAdminOrder(order, handlers.isMaster)) {
     const cancelButton = document.createElement("button");
     cancelButton.className = "button secondary order-cancel-button";
@@ -132,6 +236,67 @@ function renderAdminOrder(order, handlers) {
     cancelButton.addEventListener("click", () => handlers.onCancelOrder(order, cancelButton));
     card.append(cancelButton);
   }
+  return card;
+}
+
+function canPartnerAct(order) {
+  return order.paymentStatus === "aprovado" && order.deliveryStatus === "aguardando_parceiro";
+}
+
+function renderPartnerOrder(order, handlers) {
+  const card = document.createElement("article");
+  card.className = "admin-card order-admin-card";
+
+  const status = document.createElement("span");
+  status.className = "card-kicker";
+  status.textContent = DELIVERY_STATUS_LABELS[order.deliveryStatus] || order.deliveryStatus;
+
+  const title = document.createElement("h2");
+  title.textContent = `Pedido #${order.number}`;
+
+  const customer = document.createElement("p");
+  customer.textContent = `${order.customerName} | ${order.customerEmail}`;
+
+  const address = document.createElement("p");
+  address.textContent = addressText(order.address);
+
+  const forecast = document.createElement("p");
+  forecast.className = "extension-note";
+  forecast.textContent = `${deliveryWindow({ previsao_inicio: order.forecastStart, previsao_fim: order.forecastEnd })} | ${PAYOUT_STATUS_LABELS[order.payoutStatus] || order.payoutStatus}`;
+
+  const payout = document.createElement("strong");
+  payout.textContent = `Repasse previsto: ${formatCurrency(order.payoutTotal)}`;
+
+  const items = document.createElement("p");
+  items.textContent = order.items.map((item) => {
+    const variation = item.variationName && item.variationName !== "Padrao" ? ` (${item.variationName})` : "";
+    return `${item.quantity}x ${item.name}${variation}`;
+  }).join(" | ") || "Itens não encontrados para este parceiro.";
+
+  card.append(status, title, customer, address, forecast, payout, items);
+
+  if (canPartnerAct(order)) {
+    const actions = document.createElement("div");
+    actions.className = "checkout-actions";
+
+    const shipButton = document.createElement("button");
+    shipButton.className = "button primary";
+    shipButton.type = "button";
+    shipButton.textContent = "Confirmar envio";
+    shipButton.disabled = handlers.processingDeliveryId === order.deliveryId;
+    shipButton.addEventListener("click", () => handlers.onConfirmDelivery(order, "envio", shipButton));
+
+    const personalButton = document.createElement("button");
+    personalButton.className = "button secondary";
+    personalButton.type = "button";
+    personalButton.textContent = "Confirmar entrega pessoal";
+    personalButton.disabled = handlers.processingDeliveryId === order.deliveryId;
+    personalButton.addEventListener("click", () => handlers.onConfirmDelivery(order, "entrega_pessoal", personalButton));
+
+    actions.append(shipButton, personalButton);
+    card.append(actions);
+  }
+
   return card;
 }
 
@@ -171,7 +336,7 @@ function renderAdminPayment(payment) {
   return card;
 }
 
-export async function initAdminOrders({ isMaster = false } = {}) {
+export async function initAdminOrders({ role = "", isMaster = false } = {}) {
   const container = document.querySelector("[data-admin-orders]");
   const feedback = document.querySelector("[data-admin-orders-feedback]");
   const paymentsContainer = document.querySelector("[data-admin-payments]");
@@ -179,6 +344,7 @@ export async function initAdminOrders({ isMaster = false } = {}) {
   if (!container) return;
   let paymentEngine = null;
   let processingOrderId = "";
+  let processingDeliveryId = "";
 
   async function onCancelOrder(order, button) {
     const motivo = window.prompt("Motivo do cancelamento:");
@@ -204,6 +370,29 @@ export async function initAdminOrders({ isMaster = false } = {}) {
   }
 
   async function refresh() {
+    if (role === "parceiro") {
+      const orders = await loadPartnerOrders();
+      if (feedback) {
+        feedback.textContent = `${orders.length} entrega${orders.length === 1 ? "" : "s"} em acompanhamento.`;
+      }
+      paymentsContainer?.replaceChildren();
+      if (paymentsFeedback) paymentsFeedback.textContent = "";
+
+      if (!orders.length) {
+        const empty = document.createElement("div");
+        empty.className = "empty-state";
+        empty.textContent = "Nenhum pedido pago dos seus produtos por enquanto.";
+        container.replaceChildren(empty);
+        return;
+      }
+
+      container.replaceChildren(...orders.map((order) => renderPartnerOrder(order, {
+        processingDeliveryId,
+        onConfirmDelivery,
+      })));
+      return;
+    }
+
     const [orders, payments, engine] = await Promise.all([
       loadAdminOrders(),
       loadAdminPayments(),
@@ -239,6 +428,26 @@ export async function initAdminOrders({ isMaster = false } = {}) {
       } else {
         paymentsContainer.replaceChildren(...payments.map(renderAdminPayment));
       }
+    }
+  }
+
+  async function onConfirmDelivery(order, method, button) {
+    const message = method === "entrega_pessoal"
+      ? "Confirmar que você realizou a entrega pessoal deste pedido?"
+      : "Confirmar que este pedido foi enviado ao cliente?";
+    if (!window.confirm(message)) return;
+
+    processingDeliveryId = order.deliveryId;
+    button.disabled = true;
+    button.textContent = "Confirmando...";
+    try {
+      await confirmPartnerDelivery(order.deliveryId, method);
+      processingDeliveryId = "";
+      await refresh();
+    } catch (error) {
+      window.alert(error.message);
+      processingDeliveryId = "";
+      await refresh();
     }
   }
 

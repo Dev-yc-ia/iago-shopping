@@ -121,7 +121,9 @@ function paymentMessage(order, processing = false, method = order.paymentMethod)
   }
   if (processing) return "Gerando pagamento Pix e aguardando confirmação automática do provider.";
   if (order.status === "cancelado") return "Pedido cancelado. O histórico permanece em Meus pedidos.";
-  if (order.paymentStatus === "aprovado") return "Pagamento confirmado. Seu pedido já está aprovado e o estoque foi reservado.";
+  if (order.paymentStatus === "aprovado") {
+    return "Pagamento confirmado. Seu pedido foi encaminhado ao parceiro responsável. Acompanhe a entrega em Meus Pedidos.";
+  }
   if (order.paymentErrorMessage) return order.paymentErrorMessage;
   if (order.paymentStatus === "recusado") return "Pagamento recusado. Você pode iniciar uma nova tentativa com outro método.";
   if (order.paymentStatus === "expirado") return "Pagamento expirado. Gere uma nova tentativa para continuar.";
@@ -232,7 +234,8 @@ function renderSteps(order) {
     ["Pagamento gerado", hasPayment],
     ["Aguardando pagamento", hasPayment && !isFinalPaymentStatus(order.paymentStatus)],
     ["Pagamento confirmado", isApproved],
-    ["Pedido confirmado", isApproved],
+    ["Aguardando parceiro", isApproved],
+    ["Recebimento confirmado", false],
   ];
 
   stages.forEach(([label, active]) => {

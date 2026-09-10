@@ -13,6 +13,14 @@ const ORDER_STATUS_LABELS = {
   cancelado: "Cancelado",
 };
 
+const DELIVERY_STATUS_LABELS = {
+  aguardando_parceiro: "Parceiro preparando",
+  enviado: "Parceiro confirmou envio",
+  entregue_pessoalmente: "Parceiro confirmou entrega pessoal",
+  recebido_cliente: "Recebimento confirmado",
+  cancelado: "Entrega cancelada",
+};
+
 function currentRelativeUrl() {
   return `/pedidos/${window.location.search}`;
 }
@@ -43,8 +51,19 @@ function formatDate(value) {
   }).format(new Date(value));
 }
 
+function formatDateOnly(value) {
+  if (!value) return "";
+  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short" }).format(new Date(value));
+}
+
+function deliveryWindow(delivery) {
+  if (!delivery?.previsao_inicio || !delivery?.previsao_fim) return "";
+  return `Previsão entre ${formatDateOnly(delivery.previsao_inicio)} e ${formatDateOnly(delivery.previsao_fim)}`;
+}
+
 function normalizeOrder(order) {
   const items = Array.isArray(order.itens) ? order.itens : [];
+  const deliveries = Array.isArray(order.entregas) ? order.entregas : [];
   const internalNumber = order.numero;
   return {
     id: order.id,
@@ -71,10 +90,12 @@ function normalizeOrder(order) {
     paymentLastSync: order.pagamento_ultima_sincronizacao || "",
     total: Number(order.total || 0),
     currency: order.moeda || "BRL",
+    fulfillmentStatus: order.fulfillment_status || "pendente_pagamento",
     canceledAt: order.cancelado_em || "",
     canceledByType: order.cancelado_por_tipo || "",
     cancellationReason: order.motivo_cancelamento || "",
     createdAt: order.criado_em,
+    deliveries,
     items: items.map((item) => ({
       id: item.item_id,
       productId: item.produto_id,
@@ -133,6 +154,17 @@ async function loadOrders() {
   return (data || []).map(normalizeOrder);
 }
 
+async function confirmCustomerReceipt(deliveryId) {
+  const supabase = await getAuthenticatedOrdersClient();
+  if (!supabase) return;
+
+  const { error } = await supabase.rpc("shopping_cliente_confirmar_recebimento", {
+    p_entrega_id: deliveryId,
+  });
+  if (error) throw error;
+  recordEvent("order_customer_receipt_confirmed", { deliveryId });
+}
+
 function renderOrderItem(item) {
   const row = document.createElement("div");
   row.className = "order-item";
@@ -189,7 +221,7 @@ function paymentMessageText(order, isProcessing = false) {
   }
 
   if (order.paymentStatus === "aprovado") {
-    return "Pagamento aprovado. O estoque foi confirmado automaticamente.";
+    return "Pagamento aprovado. Seu pedido foi encaminhado ao parceiro responsável.";
   }
 
   if (order.paymentStatus === "recusado") {
@@ -227,6 +259,58 @@ function renderPaymentSummary(order) {
   message.textContent = paymentMessageText(order);
 
   panel.append(title, message);
+  return panel;
+}
+
+function canConfirmDeliveryReceipt(order, delivery) {
+  return order.paymentStatus === "aprovado"
+    && ["enviado", "entregue_pessoalmente"].includes(delivery.status)
+    && !delivery.cliente_confirmado_em;
+}
+
+function renderDeliveryStatus(order, delivery, handlers) {
+  const panel = document.createElement("div");
+  panel.className = "payment-panel payment-panel--summary delivery-panel";
+
+  const title = document.createElement("strong");
+  title.textContent = DELIVERY_STATUS_LABELS[delivery.status] || delivery.status || "Entrega";
+
+  const partner = document.createElement("p");
+  partner.className = "payment-status-message";
+  partner.textContent = delivery.parceiro_nome
+    ? `Parceiro: ${delivery.parceiro_nome}`
+    : "Parceiro responsável pelo pedido.";
+
+  const forecast = document.createElement("p");
+  forecast.className = "payment-status-message";
+  forecast.textContent = deliveryWindow(delivery) || "Previsão de entrega em acompanhamento.";
+
+  panel.append(title, partner, forecast);
+
+  if (delivery.status === "enviado") {
+    const note = document.createElement("p");
+    note.className = "payment-status-message";
+    note.textContent = "Aguardando você receber o produto.";
+    panel.append(note);
+  }
+
+  if (delivery.status === "entregue_pessoalmente") {
+    const note = document.createElement("p");
+    note.className = "payment-status-message";
+    note.textContent = "Confirme abaixo quando o produto estiver com você.";
+    panel.append(note);
+  }
+
+  if (canConfirmDeliveryReceipt(order, delivery)) {
+    const button = document.createElement("button");
+    button.className = "button primary";
+    button.type = "button";
+    button.textContent = "Confirmar recebimento";
+    button.disabled = handlers.processingDeliveryId === delivery.entrega_id;
+    button.addEventListener("click", () => handlers.onConfirmReceipt(delivery, button));
+    panel.append(button);
+  }
+
   return panel;
 }
 
@@ -273,9 +357,14 @@ function renderOrderCard(order, highlightedId, handlers) {
   const checkoutLink = document.createElement("a");
   checkoutLink.className = "button primary";
   checkoutLink.href = `/checkout/?pedido=${encodeURIComponent(order.id)}`;
-  checkoutLink.textContent = order.paymentStatus === "aprovado" ? "Ver checkout" : "Continuar pagamento";
+  checkoutLink.textContent = order.paymentStatus === "aprovado" ? "Ver pagamento" : "Continuar pagamento";
 
   card.append(header, itemList, paymentSummary);
+  if (order.paymentStatus === "aprovado" && order.deliveries.length) {
+    order.deliveries.forEach((delivery) => {
+      card.append(renderDeliveryStatus(order, delivery, handlers));
+    });
+  }
   const cancellationDetails = renderCancellationDetails(order);
   if (cancellationDetails) card.append(cancellationDetails);
 
@@ -322,6 +411,7 @@ export async function initOrdersPage() {
   if (!container) return;
   let paymentEngine = null;
   let processingOrderId = "";
+  let processingDeliveryId = "";
 
   async function refreshOrders() {
     try {
@@ -332,7 +422,9 @@ export async function initOrdersPage() {
       paymentEngine = engine;
       renderOrders(container, summary, orders, {
         processingOrderId,
+        processingDeliveryId,
         onCancelOrder,
+        onConfirmReceipt,
       });
     } catch (error) {
       container.replaceChildren();
@@ -350,6 +442,22 @@ export async function initOrdersPage() {
       window.alert(error.message);
     } finally {
       processingOrderId = "";
+      await refreshOrders();
+    }
+  }
+
+  async function onConfirmReceipt(delivery, button) {
+    if (!window.confirm("Confirma que recebeu este produto/pacote?")) return;
+
+    processingDeliveryId = delivery.entrega_id;
+    button.disabled = true;
+    button.textContent = "Confirmando...";
+    try {
+      await confirmCustomerReceipt(delivery.entrega_id);
+    } catch (error) {
+      window.alert(error.message);
+    } finally {
+      processingDeliveryId = "";
       await refreshOrders();
     }
   }

@@ -8,6 +8,10 @@ const EMPTY_PRODUCT = {
   marca: "",
   categoria: "shapes",
   preco: "",
+  parceiro_user_id: "",
+  parceiro_nome: "",
+  parceiro_email: "",
+  valor_repasse_parceiro: "",
   quantidade_estoque: 0,
   variacoes: [],
   descricao: "",
@@ -42,6 +46,7 @@ const ALLOWED_PHOTO_TYPES = new Set([
 let selectedPhotoPreviewUrls = [];
 let selectedCoverIndex = 0;
 let currentPersistedImages = [];
+let activePartners = [];
 
 function formatCurrency(value) {
   const number = Number(value || 0);
@@ -314,6 +319,13 @@ async function listProducts() {
   return data || [];
 }
 
+async function listActivePartners() {
+  const supabase = await getSupabaseClient();
+  const { data, error } = await supabase.rpc("shopping_admin_listar_parceiros_ativos");
+  if (error) throw error;
+  return data || [];
+}
+
 async function saveProduct(product) {
   const supabase = await getSupabaseClient();
   const uploadedImages = await uploadProductPhotosToStorage(supabase, product.fotosProduto, product);
@@ -332,6 +344,8 @@ async function saveProduct(product) {
       p_imagens: imagens,
       p_status: product.status,
       p_variacoes: product.variacoes,
+      p_parceiro_user_id: product.parceiroUserId || null,
+      p_valor_repasse_parceiro: product.valorRepasseParceiro === "" ? null : Number(product.valorRepasseParceiro),
     });
     if (error) throw error;
   } catch (error) {
@@ -394,6 +408,14 @@ function readVariationRowsQuietly(form) {
 }
 
 function readProductForm(form) {
+  const price = Number(getFormValue(form, "preco"));
+  const payoutValue = getFormValue(form, "valorRepasseParceiro");
+  const payout = payoutValue === "" ? null : Number(payoutValue);
+
+  if (Number.isFinite(payout) && Number.isFinite(price) && payout > price) {
+    throw new Error("Repasse ao parceiro não pode ser maior que o preço final.");
+  }
+
   return {
     id: getFormValue(form, "id") || null,
     sku: getFormValue(form, "sku"),
@@ -401,12 +423,43 @@ function readProductForm(form) {
     marca: getFormValue(form, "marca"),
     categoria: getFormValue(form, "categoria"),
     preco: getFormValue(form, "preco"),
+    parceiroUserId: getFormValue(form, "parceiroUserId"),
+    valorRepasseParceiro: payoutValue,
     variacoes: readVariationRows(form),
     descricao: getFormValue(form, "descricao"),
     status: getFormValue(form, "status"),
     fotosProduto: getSelectedPhotos(form),
     imagens: normalizeImagesWithCover(currentPersistedImages),
   };
+}
+
+function partnerLabel(partner) {
+  return partner.nome_exibicao
+    || partner.nome_completo
+    || partner.email_normalizado
+    || partner.user_id;
+}
+
+function renderPartnerOptions(form, partners = activePartners) {
+  const select = form.elements.parceiroUserId;
+  if (!select) return;
+
+  const currentValue = select.value;
+  select.replaceChildren();
+
+  const empty = document.createElement("option");
+  empty.value = "";
+  empty.textContent = "Selecione um parceiro ativo";
+  select.append(empty);
+
+  partners.forEach((partner) => {
+    const option = document.createElement("option");
+    option.value = partner.user_id;
+    option.textContent = partnerLabel(partner);
+    select.append(option);
+  });
+
+  select.value = currentValue;
 }
 
 function renderVariationRows(form, variations = [DEFAULT_VARIATION]) {
@@ -478,6 +531,8 @@ function fillProductForm(form, product = EMPTY_PRODUCT) {
   form.elements.marca.value = product.marca || "";
   form.elements.categoria.value = product.categoria || "shapes";
   form.elements.preco.value = product.preco ?? "";
+  form.elements.parceiroUserId.value = product.parceiro_user_id || "";
+  form.elements.valorRepasseParceiro.value = product.valor_repasse_parceiro ?? "";
   form.elements.descricao.value = product.descricao || "";
   form.elements.status.value = product.status || "rascunho";
   renderVariationRows(form, variationsForProduct(product));
@@ -490,6 +545,7 @@ function fillProductForm(form, product = EMPTY_PRODUCT) {
   }
 
   refreshPhotoPreview(form);
+  updateCommercialPreview(form);
 }
 
 function productTitle(product) {
@@ -526,6 +582,17 @@ function updateLivePreview(form, imageUrl = firstImageUrl(currentPreviewImages()
   if (previewCategory) previewCategory.textContent = CATEGORY_LABELS[category] || "Categoria";
   if (previewAvailability) previewAvailability.textContent = stock > 0 ? "Disponível" : "Esgotado";
   if (previewStock) previewStock.textContent = stockLabel(stock);
+  updateCommercialPreview(form);
+}
+
+function updateCommercialPreview(form) {
+  const marginPreview = form.querySelector("[data-product-margin-preview]");
+  if (!marginPreview) return;
+
+  const price = Number(getFormValue(form, "preco") || 0);
+  const payout = Number(getFormValue(form, "valorRepasseParceiro") || 0);
+  const margin = Math.max(0, price - payout);
+  marginPreview.textContent = `Margem IAGO: ${formatCurrency(margin)}`;
 }
 
 function renderProductCard(product, onEdit, onDelete) {
@@ -541,6 +608,12 @@ function renderProductCard(product, onEdit, onDelete) {
 
   const description = document.createElement("p");
   description.textContent = `${product.sku} | ${product.marca} | ${product.categoria} | ${stockLabel(product.quantidade_estoque)}`;
+
+  const commercial = document.createElement("p");
+  commercial.className = product.comercial_configurado ? "extension-note" : "extension-note product-commercial-warning";
+  commercial.textContent = product.comercial_configurado
+    ? `Parceiro: ${product.parceiro_nome || product.parceiro_email || "ativo"} | Repasse ${formatCurrency(product.valor_repasse_parceiro)}`
+    : "Configuração comercial pendente: parceiro e repasse obrigatórios para publicar.";
 
   const imageUrl = firstImageUrl(product.imagens);
   const image = createProductImage({
@@ -563,7 +636,7 @@ function renderProductCard(product, onEdit, onDelete) {
   deleteButton.textContent = "Excluir";
   deleteButton.addEventListener("click", () => onDelete(product.id));
 
-  card.append(status, title, description, editButton, deleteButton);
+  card.append(status, title, description, commercial, editButton, deleteButton);
   return card;
 }
 
@@ -576,7 +649,9 @@ export function initAdminProducts() {
 
   async function refreshProducts() {
     try {
-      const products = await listProducts();
+      const [products, partners] = await Promise.all([listProducts(), listActivePartners()]);
+      activePartners = partners;
+      renderPartnerOptions(form);
       list.replaceChildren(
         ...products.map((product) => renderProductCard(product, fillProductForm.bind(null, form), async (id) => {
           try {
@@ -598,8 +673,8 @@ export function initAdminProducts() {
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const product = readProductForm(form);
     try {
+      const product = readProductForm(form);
       await saveProduct(product);
       fillProductForm(form);
       await refreshProducts();

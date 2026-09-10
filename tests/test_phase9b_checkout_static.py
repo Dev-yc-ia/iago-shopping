@@ -51,7 +51,7 @@ def test_phase9b_checkout_uses_payment_engine_without_manual_approval():
         "Pagamento gerado",
         "Aguardando pagamento",
         "Pagamento confirmado",
-        "Pedido confirmado",
+        "Aguardando parceiro",
         "Gerar novo Pix",
         "Tentar outro pagamento",
         "Cancelar pagamento",

@@ -45,12 +45,12 @@
         </article>
         <article class="admin-card">
           <span class="card-kicker">Parceiro</span>
-          <h2>Catálogo</h2>
-          <p>Acesso administrativo preparado para fases comerciais futuras.</p>
+          <h2>Entregas</h2>
+          <p>Pedidos pagos dos produtos atribuídos ao parceiro, com confirmação de envio ou entrega pessoal.</p>
         </article>
       </section>
 
-      <section class="section-head">
+      <section class="section-head" data-admin-master-area>
         <div>
           <span class="eyebrow">Produtos</span>
           <h1>Cadastro</h1>
@@ -58,7 +58,7 @@
         <p data-product-feedback>Carregando produtos.</p>
       </section>
 
-      <section class="catalog-layout">
+      <section class="catalog-layout" data-admin-master-area>
         <form class="filters-panel product-form" data-product-form>
           <input type="hidden" name="id">
 
@@ -82,6 +82,15 @@
 
           <label for="product-price">Preço</label>
           <input id="product-price" name="preco" type="number" min="0" step="0.01" placeholder="0.00" required>
+
+          <label for="product-partner">Parceiro responsável</label>
+          <select id="product-partner" name="parceiroUserId" data-product-partner>
+            <option value="">Selecione um parceiro ativo</option>
+          </select>
+
+          <label for="product-partner-payout">Repasse ao parceiro</label>
+          <input id="product-partner-payout" name="valorRepasseParceiro" type="number" min="0" step="0.01" placeholder="0.00">
+          <div class="sku-status" data-product-margin-preview>Margem IAGO: R$ 0,00</div>
 
           <fieldset class="variation-editor">
             <legend>Tamanho/Variação e estoque</legend>
@@ -135,7 +144,7 @@
         </div>
       </section>
 
-      <section class="section-head">
+      <section class="section-head" data-admin-orders-area>
         <div>
           <span class="eyebrow">Pedidos</span>
           <h1>Recebidos</h1>
@@ -143,9 +152,9 @@
         <p data-admin-orders-feedback>Carregando pedidos.</p>
       </section>
 
-      <section class="admin-grid" data-admin-orders></section>
+      <section class="admin-grid" data-admin-orders data-admin-orders-area></section>
 
-      <section class="section-head">
+      <section class="section-head" data-admin-payments-area>
         <div>
           <span class="eyebrow">Pagamentos</span>
           <h1>Engine Mock</h1>
@@ -153,7 +162,7 @@
         <p data-admin-payments-feedback>Carregando pagamentos.</p>
       </section>
 
-      <section class="admin-grid" data-admin-payments></section>
+      <section class="admin-grid" data-admin-payments data-admin-payments-area></section>
 
       <section class="section-head" data-master-only hidden>
         <div>
