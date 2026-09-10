@@ -50,8 +50,10 @@ def test_phase9b_checkout_uses_payment_engine_without_manual_approval():
         "Pedido criado",
         "Pagamento gerado",
         "Aguardando pagamento",
+        "isAwaitingPayment",
         "Pagamento confirmado",
         "Aguardando parceiro",
+        "Parceiro enviou",
         "Gerar novo Pix",
         "Tentar outro pagamento",
         "Cancelar pagamento",
@@ -68,6 +70,7 @@ def test_phase9b_checkout_uses_payment_engine_without_manual_approval():
     assert "Expirar" not in checkout
     assert "Cancelar pedido" not in checkout
     assert 'rpc("shopping_pagamento_mock_simular"' not in checkout
+    assert '["Aguardando pagamento", isAwaitingPayment, isAwaitingPayment]' in checkout
 
 
 def test_phase9b_styles_and_docs_are_updated():

@@ -116,8 +116,13 @@ def test_web10_frontend_customer_receipt_flow_and_checkout_copy():
         "Parceiro confirmou envio",
         "Parceiro confirmou entrega pessoal",
         "Recebimento confirmado",
+        "Pedido concluído",
+        "Recebimento confirmado. Obrigado por concluir o pedido.",
+        "Recebimento confirmado em",
         "Pagamento confirmado. Seu pedido foi encaminhado ao parceiro responsável. Acompanhe a entrega em Meus Pedidos.",
+        "Pedido concluído. Recebimento confirmado pelo cliente.",
         "Aguardando parceiro",
+        "Parceiro enviou",
     ]:
         assert fragment in orders + checkout
 

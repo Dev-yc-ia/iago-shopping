@@ -1094,6 +1094,97 @@ textarea {
   line-height: 1.35;
 }
 
+.auth-notice[data-tone="success"],
+[data-partner-feedback][data-tone="success"] {
+  border-color: rgba(34, 197, 94, 0.58);
+}
+
+.auth-notice[data-tone="error"],
+[data-partner-feedback][data-tone="error"] {
+  border-color: rgba(255, 107, 107, 0.62);
+  color: #ffb3b3;
+}
+
+.partner-signup-page {
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.partner-signup-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
+  gap: 18px;
+  align-items: start;
+}
+
+.partner-signup-form {
+  gap: 16px;
+}
+
+.partner-step {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.partner-step h2,
+.partner-summary h2 {
+  margin: 6px 0 0;
+  font-family: var(--font-brand);
+  font-size: 1.05rem;
+  line-height: 1.15;
+}
+
+.partner-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.partner-actions .button {
+  flex: 1 1 150px;
+}
+
+.seller-terms-panel {
+  border-color: rgba(25, 221, 218, 0.32);
+  background: rgba(25, 221, 218, 0.05);
+}
+
+.seller-terms-panel p,
+.partner-summary p {
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: 1.42;
+}
+
+.terms-acceptance {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(3, 13, 20, 0.45);
+  color: var(--text-primary);
+  font-size: 0.88rem;
+  line-height: 1.42;
+}
+
+.terms-acceptance input {
+  width: 18px;
+  min-height: 18px;
+  margin: 2px 0 0;
+}
+
+.partner-application-card {
+  display: grid;
+  gap: 10px;
+}
+
 .product-cart-button {
   width: 100%;
   margin: 4px 0 12px;
@@ -1817,6 +1908,7 @@ textarea {
   }
 
   .catalog-layout,
+  .partner-signup-layout,
   .product-showcase,
   .cart-layout,
   .checkout-shell,

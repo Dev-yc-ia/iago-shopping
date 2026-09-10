@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Cadastro de parceiro | IAGO Shopping</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body data-page="partner-signup">
+  <div class="app-shell">
+    <header class="app-header">
+      <a class="brand-mark" href="/" aria-label="IAGO Shopping">
+        <img src="/assets/logos/Logo_IAGO_completa_branca.png" alt="IAGO" class="brand-logo">
+        <span class="brand-divider"></span>
+        <span class="brand-product">Shopping</span>
+      </a>
+
+      <nav class="top-nav" aria-label="Navegação principal">
+        <a href="/login/">Login</a>
+        <a href="/catalogo/">Catálogo</a>
+        <a href="/admin/" hidden>Admin</a>
+      </nav>
+    </header>
+
+    <main class="page-main partner-signup-page">
+      <section class="section-head">
+        <div>
+          <span class="eyebrow">Parceiros</span>
+          <h1>Quero vender no IAGO</h1>
+        </div>
+        <p data-partner-session-status>Entre ou crie sua conta para enviar a solicitação.</p>
+      </section>
+
+      <section class="partner-signup-layout">
+        <form class="filters-panel partner-signup-form" data-partner-form>
+          <section class="partner-step">
+            <span class="card-kicker">1. Acesso</span>
+            <label for="partner-email">E-mail</label>
+            <input id="partner-email" name="email" type="email" autocomplete="email" placeholder="seu e-mail" required>
+
+            <label for="partner-password">Senha</label>
+            <input id="partner-password" name="password" type="password" autocomplete="new-password" placeholder="mínimo de 6 caracteres">
+
+            <div class="partner-actions">
+              <button class="button secondary" type="button" data-partner-password-login>Entrar</button>
+              <button class="button secondary" type="button" data-partner-password-signup>Criar conta</button>
+              <button class="button ghost" type="button" data-partner-google>Continuar com Google</button>
+            </div>
+          </section>
+
+          <section class="partner-step">
+            <span class="card-kicker">2. Cadastro</span>
+            <label for="partner-person-type">Tipo de pessoa</label>
+            <select id="partner-person-type" name="tipoPessoa" required>
+              <option value="PF">Pessoa Física (CPF)</option>
+              <option value="PJ">Pessoa Jurídica (CNPJ)</option>
+            </select>
+
+            <label for="partner-name">Nome ou razão social</label>
+            <input id="partner-name" name="nome" type="text" autocomplete="name" placeholder="nome público do vendedor" required>
+
+            <label for="partner-document">CPF ou CNPJ</label>
+            <input id="partner-document" name="documento" type="text" inputmode="numeric" placeholder="somente números" required>
+
+            <label for="partner-phone">Telefone</label>
+            <input id="partner-phone" name="telefone" type="tel" autocomplete="tel" placeholder="contato comercial">
+
+            <label for="partner-store-name">Nome da loja</label>
+            <input id="partner-store-name" name="nomeLoja" type="text" placeholder="como sua loja aparecerá no IAGO">
+          </section>
+
+          <section class="partner-step seller-terms-panel" aria-labelledby="seller-terms-title">
+            <span class="card-kicker">3. Termos</span>
+            <h2 id="seller-terms-title">TERMOS E CONDIÇÕES PARA VENDEDORES</h2>
+            <p>Versão <span data-seller-terms-version>1.0</span></p>
+            <p>Vigência: <span data-seller-terms-effective>10/09/2026</span></p>
+
+            <div class="partner-actions">
+              <a class="button secondary" data-seller-terms-read target="_blank" rel="noopener">Ler Termos</a>
+              <a class="button secondary" data-seller-terms-download download>Baixar PDF</a>
+            </div>
+
+            <label class="terms-acceptance">
+              <input type="checkbox" name="aceiteTermos" data-seller-terms-checkbox>
+              <span data-seller-terms-text>Declaro que li e aceito os Termos e Condições de Uso para Vendedores do IAGO Shopping,
+na versão indicada nesta página, bem como as políticas expressamente incorporadas e
+disponibilizadas para consulta.</span>
+            </label>
+          </section>
+
+          <button class="button primary" type="submit">Enviar solicitação</button>
+          <p class="auth-notice" data-partner-feedback hidden></p>
+        </form>
+
+        <aside class="notice-panel partner-summary">
+          <span class="card-kicker">Análise Master</span>
+          <h2>Solicitação pendente</h2>
+          <p>O cadastro cria uma solicitação para análise. O Google ou a senha confirmam a identidade, mas o papel de parceiro só é liberado depois da aprovação do Master.</p>
+          <p>Clientes já cadastrados podem usar a mesma conta para solicitar a evolução para parceiro.</p>
+        </aside>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="/core/app.js"></script>
+</body>
+</html>

@@ -7,6 +7,7 @@ import { initEntryPage } from "../features/entry.js";
 import { initLoginPage } from "../features/login.js";
 import { initOrdersPage } from "../features/orders.js";
 import { initPasswordRecoveryPage, initPasswordUpdatePage } from "../features/passwordRecovery.js";
+import { initPartnerSignupPage } from "../features/partnerSignup.js";
 import { initProductPage } from "../features/product.js";
 import { initProfilePage } from "../features/profile.js";
 import { recordEvent } from "../utils/analytics.js";
@@ -32,6 +33,7 @@ function boot() {
   if (page === "checkout") initCheckoutPage();
   if (page === "orders") initOrdersPage();
   if (page === "login") initLoginPage();
+  if (page === "partner-signup") initPartnerSignupPage();
   if (page === "admin") initAdminPage();
   if (page === "profile") initProfilePage();
   if (page === "password-recovery") initPasswordRecoveryPage();

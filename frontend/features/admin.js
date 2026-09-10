@@ -1,4 +1,6 @@
 import {
+  decidePartnerApplication,
+  listPartnerApplications,
   listAdminProfiles,
   requireAdminAccess,
   setProfileActivationStatus,
@@ -19,6 +21,12 @@ const STATUS_LABELS = {
   ativo: "Ativo",
   bloqueado: "Bloqueado",
   inativo: "Inativo",
+};
+
+const PARTNER_APPLICATION_STATUS_LABELS = {
+  pendente: "Pendente",
+  aprovado: "Aprovado",
+  recusado: "Recusado",
 };
 
 function renderAdminState(profile) {
@@ -109,6 +117,89 @@ function renderProfileCard(profile) {
   return card;
 }
 
+function renderPartnerApplicationCard(application, onDecision) {
+  const card = document.createElement("article");
+  card.className = "admin-card partner-application-card";
+
+  const status = document.createElement("span");
+  status.className = "card-kicker";
+  status.textContent = PARTNER_APPLICATION_STATUS_LABELS[application.status] || application.status;
+
+  const title = document.createElement("h2");
+  title.textContent = application.nome || application.nome_loja || application.email_normalizado || "Solicitação de parceiro";
+
+  const details = document.createElement("p");
+  details.textContent = [
+    application.email_normalizado || "Sem e-mail",
+    application.tipo_pessoa || "PF/PJ",
+    application.documento_normalizado || "Documento não informado",
+  ].join(" | ");
+
+  const terms = document.createElement("p");
+  terms.className = "extension-note";
+  terms.textContent = `Termos V${application.versao_termo} aceitos em ${new Date(application.aceito_em).toLocaleString("pt-BR")}.`;
+
+  const approveButton = document.createElement("button");
+  approveButton.className = "button primary";
+  approveButton.type = "button";
+  approveButton.textContent = "Aprovar";
+  approveButton.disabled = application.status !== "pendente";
+  approveButton.addEventListener("click", () => onDecision(application, "aprovado"));
+
+  const rejectButton = document.createElement("button");
+  rejectButton.className = "button ghost";
+  rejectButton.type = "button";
+  rejectButton.textContent = "Recusar";
+  rejectButton.disabled = application.status !== "pendente";
+  rejectButton.addEventListener("click", () => onDecision(application, "recusado"));
+
+  card.append(status, title, details, terms, approveButton, rejectButton);
+  return card;
+}
+
+async function loadPartnerApplications() {
+  const container = document.querySelector("[data-partner-applications]");
+  const feedback = document.querySelector("[data-partner-applications-feedback]");
+  if (!container) return;
+
+  async function decide(application, decision) {
+    const defaultReason = decision === "aprovado"
+      ? "Aprovação Master do cadastro de parceiro."
+      : "";
+    const reason = window.prompt(
+      decision === "aprovado"
+        ? "Motivo da aprovação"
+        : "Motivo da recusa",
+      defaultReason,
+    );
+    if (reason === null) return;
+
+    try {
+      await decidePartnerApplication(application.id, decision, reason);
+      await loadPartnerApplications();
+      await loadMasterProfiles();
+    } catch (error) {
+      window.alert(error.message);
+    }
+  }
+
+  try {
+    const applications = await listPartnerApplications();
+    if (!applications.length) {
+      container.innerHTML = '<p class="empty-state">Nenhuma solicitação de parceiro encontrada.</p>';
+    } else {
+      container.replaceChildren(...applications.map((application) => (
+        renderPartnerApplicationCard(application, decide)
+      )));
+    }
+    if (feedback) {
+      feedback.textContent = `${applications.length} solicitação${applications.length === 1 ? "" : "ões"} encontrada${applications.length === 1 ? "" : "s"}.`;
+    }
+  } catch (error) {
+    if (feedback) feedback.textContent = error.message;
+  }
+}
+
 async function loadMasterProfiles() {
   const container = document.querySelector("[data-admin-profiles]");
   if (!container) return;
@@ -159,6 +250,7 @@ export function initAdminPage() {
       initAdminOrders({ role: profile.papel, isMaster: profile.papel === "master" });
       if (profile.papel === "master") {
         loadMasterProfiles();
+        loadPartnerApplications();
       }
     })
     .catch(() => {

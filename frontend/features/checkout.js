@@ -57,6 +57,7 @@ async function loadPreferredPaymentMethod() {
 
 function normalizeOrder(order) {
   const items = Array.isArray(order.itens) ? order.itens : [];
+  const deliveries = Array.isArray(order.entregas) ? order.entregas : [];
   const internalNumber = order.numero;
   return {
     id: order.id,
@@ -79,6 +80,7 @@ function normalizeOrder(order) {
     total: Number(order.total || 0),
     currency: order.moeda || "BRL",
     createdAt: order.criado_em,
+    deliveries,
     items: items.map((item) => ({
       id: item.item_id,
       variationId: item.variacao_id || null,
@@ -93,6 +95,18 @@ function normalizeOrder(order) {
       subtotal: Number(item.subtotal || 0),
     })),
   };
+}
+
+function hasReceivedDelivery(order) {
+  return (order.deliveries || []).some((delivery) => (
+    delivery.status === "recebido_cliente" || Boolean(delivery.cliente_confirmado_em)
+  ));
+}
+
+function hasPartnerDeliveryConfirmed(order) {
+  return (order.deliveries || []).some((delivery) => (
+    ["enviado", "entregue_pessoalmente", "recebido_cliente"].includes(delivery.status)
+  ));
 }
 
 async function loadCheckoutOrder() {
@@ -121,6 +135,9 @@ function paymentMessage(order, processing = false, method = order.paymentMethod)
   }
   if (processing) return "Gerando pagamento Pix e aguardando confirmação automática do provider.";
   if (order.status === "cancelado") return "Pedido cancelado. O histórico permanece em Meus pedidos.";
+  if (order.paymentStatus === "aprovado" && hasReceivedDelivery(order)) {
+    return "Pedido concluído. Recebimento confirmado pelo cliente.";
+  }
   if (order.paymentStatus === "aprovado") {
     return "Pagamento confirmado. Seu pedido foi encaminhado ao parceiro responsável. Acompanhe a entrega em Meus Pedidos.";
   }
@@ -229,16 +246,20 @@ function renderSteps(order) {
 
   const hasPayment = Boolean(order.paymentId);
   const isApproved = order.paymentStatus === "aprovado";
+  const isAwaitingPayment = hasPayment && !isFinalPaymentStatus(order.paymentStatus);
+  const received = hasReceivedDelivery(order);
+  const partnerConfirmed = hasPartnerDeliveryConfirmed(order);
   const stages = [
-    ["Pedido criado", true],
-    ["Pagamento gerado", hasPayment],
-    ["Aguardando pagamento", hasPayment && !isFinalPaymentStatus(order.paymentStatus)],
-    ["Pagamento confirmado", isApproved],
-    ["Aguardando parceiro", isApproved],
-    ["Recebimento confirmado", false],
+    ["Pedido criado", true, true],
+    ["Pagamento gerado", hasPayment, hasPayment],
+    ["Aguardando pagamento", isAwaitingPayment, isAwaitingPayment],
+    ["Pagamento confirmado", isApproved, isApproved],
+    ["Aguardando parceiro", isApproved && !partnerConfirmed && !received, isApproved && !received],
+    ["Parceiro enviou", partnerConfirmed && !received, partnerConfirmed && !received],
+    ["Recebimento confirmado", received, received],
   ];
 
-  stages.forEach(([label, active]) => {
+  stages.filter(([, , visible]) => visible).forEach(([label, active]) => {
     const step = document.createElement("span");
     step.className = "checkout-step";
     step.classList.toggle("is-active", Boolean(active));

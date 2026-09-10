@@ -125,6 +125,12 @@ function canCancelOrder(order) {
   return order.status !== "cancelado" && order.paymentStatus !== "aprovado";
 }
 
+function hasReceivedDelivery(order) {
+  return (order.deliveries || []).some((delivery) => (
+    delivery.status === "recebido_cliente" || Boolean(delivery.cliente_confirmado_em)
+  ));
+}
+
 async function cancelCustomerOrder(order, paymentEngine) {
   if (!window.confirm("Tem certeza que deseja cancelar este pedido?")) return false;
 
@@ -204,6 +210,7 @@ function renderOrderItem(item) {
 function paymentStatusText(order, isProcessing = false) {
   if (isProcessing) return "Processando pagamento";
   if (order.status === "cancelado") return "Pedido cancelado";
+  if (hasReceivedDelivery(order) || order.fulfillmentStatus === "concluido") return "Pedido concluído";
   if (order.paymentErrorCode === "mock_timeout") return "Tempo esgotado no processamento";
   if (order.paymentStatus === "expirado" && order.paymentMethod === "pix") return "PIX expirado";
   return PAYMENT_STATUS_LABELS[order.paymentStatus] || order.paymentStatus;
@@ -218,6 +225,10 @@ function paymentMessageText(order, isProcessing = false) {
     const date = order.canceledAt ? ` em ${formatDate(order.canceledAt)}` : "";
     const actor = order.canceledByType === "master" ? "pelo master" : "pelo cliente";
     return `Pedido cancelado ${actor}${date}.`;
+  }
+
+  if (order.paymentStatus === "aprovado" && hasReceivedDelivery(order)) {
+    return "Recebimento confirmado. Obrigado por concluir o pedido.";
   }
 
   if (order.paymentStatus === "aprovado") {
@@ -301,6 +312,15 @@ function renderDeliveryStatus(order, delivery, handlers) {
     panel.append(note);
   }
 
+  if (delivery.status === "recebido_cliente" || delivery.cliente_confirmado_em) {
+    const note = document.createElement("p");
+    note.className = "payment-status-message";
+    note.textContent = delivery.cliente_confirmado_em
+      ? `Recebimento confirmado em ${formatDate(delivery.cliente_confirmado_em)}.`
+      : "Recebimento confirmado pelo cliente.";
+    panel.append(note);
+  }
+
   if (canConfirmDeliveryReceipt(order, delivery)) {
     const button = document.createElement("button");
     button.className = "button primary";
@@ -357,7 +377,7 @@ function renderOrderCard(order, highlightedId, handlers) {
   const checkoutLink = document.createElement("a");
   checkoutLink.className = "button primary";
   checkoutLink.href = `/checkout/?pedido=${encodeURIComponent(order.id)}`;
-  checkoutLink.textContent = order.paymentStatus === "aprovado" ? "Ver pagamento" : "Continuar pagamento";
+  checkoutLink.textContent = order.paymentStatus === "aprovado" ? "Ver pedido" : "Continuar pagamento";
 
   card.append(header, itemList, paymentSummary);
   if (order.paymentStatus === "aprovado" && order.deliveries.length) {

@@ -300,6 +300,29 @@ export async function signUpCliente(access, password) {
   return data;
 }
 
+export async function signUpParceiro(access, password) {
+  const email = normalizeEmail(access);
+  if (!email.includes("@")) {
+    throw new Error("Informe um e-mail válido para criar a conta parceira.");
+  }
+
+  const supabase = await getSupabaseClient();
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: {
+        nome_exibicao: displayNameFromEmail(email),
+        origem: "cadastro_parceiro",
+      },
+    },
+  });
+  if (error) throw error;
+
+  recordEvent("signup_success", { source: "partner_email" });
+  return data;
+}
+
 export async function signInWithGoogle(redirectPath = "/login/") {
   const supabase = await getSupabaseClient();
   const { error } = await supabase.auth.signInWithOAuth({
@@ -311,6 +334,39 @@ export async function signInWithGoogle(redirectPath = "/login/") {
 
   if (error) throw error;
   recordEvent("login_start", { source: "supabase_google" });
+}
+
+export async function submitPartnerApplication(application) {
+  const supabase = await getSupabaseClient();
+  const { data, error } = await supabase.rpc("shopping_parceiro_solicitar_cadastro", {
+    p_tipo_pessoa: application.tipoPessoa,
+    p_documento_normalizado: application.documento,
+    p_nome: application.nome,
+    p_nome_loja: application.nomeLoja || null,
+    p_telefone_normalizado: application.telefone || null,
+    p_aceite: application.aceite,
+    p_user_agent: application.userAgent || null,
+  });
+  if (error) throw error;
+  return data?.[0] || data;
+}
+
+export async function listPartnerApplications() {
+  const supabase = await getSupabaseClient();
+  const { data, error } = await supabase.rpc("shopping_admin_listar_solicitacoes_parceiro");
+  if (error) throw error;
+  return data || [];
+}
+
+export async function decidePartnerApplication(applicationId, decision, reason = "") {
+  const supabase = await getSupabaseClient();
+  const { data, error } = await supabase.rpc("shopping_admin_decidir_solicitacao_parceiro", {
+    p_solicitacao_id: applicationId,
+    p_decisao: decision,
+    p_motivo: reason,
+  });
+  if (error) throw error;
+  return data?.[0] || data;
 }
 
 export async function signOut() {
