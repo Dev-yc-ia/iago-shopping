@@ -116,6 +116,17 @@ export function mountUserMenu(nav, { profile, session, avatarUrl, onSignOut }) {
   profileLink.addEventListener("pointerup", openProfilePage);
   profileLink.addEventListener("touchend", openProfilePage, { passive: false });
 
+  const ordersLink = document.createElement("a");
+  ordersLink.className = "user-menu-item";
+  ordersLink.href = "/pedidos/";
+  ordersLink.role = "menuitem";
+  ordersLink.textContent = "Pedidos";
+  const openOrdersPage = (event) => runTouchAction(event, () => {
+    window.location.assign(ordersLink.href);
+  });
+  ordersLink.addEventListener("pointerup", openOrdersPage);
+  ordersLink.addEventListener("touchend", openOrdersPage, { passive: false });
+
   const logoutButton = document.createElement("button");
   logoutButton.className = "user-menu-item";
   logoutButton.type = "button";
@@ -140,7 +151,7 @@ export function mountUserMenu(nav, { profile, session, avatarUrl, onSignOut }) {
   logoutButton.addEventListener("touchend", touchSignOut, { passive: false });
   logoutButton.addEventListener("click", handleSignOut);
 
-  dropdown.append(profileLink, logoutButton);
+  dropdown.append(profileLink, ordersLink, logoutButton);
   root.append(button, dropdown);
   nav.append(root);
 

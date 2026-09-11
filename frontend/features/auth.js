@@ -5,9 +5,12 @@ import { recordEvent } from "../utils/analytics.js";
 let supabaseClientPromise;
 let lastAuthNavigationSignature = "";
 let authNavigationSubscription = null;
+let cartBadgeRefreshHandler = null;
+let cartBadgeRequestId = 0;
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 const AVATAR_BUCKET = "shopping-avatars";
 const AUTH_NAVIGATION_CACHE_KEY = "iago-shopping-auth-navigation-state";
+const HEADER_CART_REFRESH_EVENT = "iago:cart:updated";
 const AVATAR_SIGNED_URL_TTL_SECONDS = 7 * 24 * 60 * 60;
 const GOOGLE_METADATA_AVATAR_KEYS = ["avatar_url", "picture"];
 const GOOGLE_METADATA_NAME_KEYS = ["full_name", "name", "nome_exibicao"];
@@ -605,19 +608,99 @@ export function invalidateAuthNavigationCache() {
   lastAuthNavigationSignature = "";
 }
 
-function appendAuthenticatedLink(nav, href, label, datasetKey) {
+function createHeaderCartIcon() {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("class", "header-cart-icon");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("fill", "none");
+  svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "1.8");
+  svg.setAttribute("stroke-linecap", "round");
+  svg.setAttribute("stroke-linejoin", "round");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("focusable", "false");
+
+  const cart = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  cart.setAttribute("d", "M6.5 7.5h14l-1.4 7.1a2 2 0 0 1-2 1.6H9.2a2 2 0 0 1-2-1.7L5.8 4.8H3.5");
+
+  const wheelLeft = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+  wheelLeft.setAttribute("cx", "9.5");
+  wheelLeft.setAttribute("cy", "20");
+  wheelLeft.setAttribute("r", "1.2");
+
+  const wheelRight = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+  wheelRight.setAttribute("cx", "17.5");
+  wheelRight.setAttribute("cy", "20");
+  wheelRight.setAttribute("r", "1.2");
+
+  svg.append(cart, wheelLeft, wheelRight);
+  return svg;
+}
+
+function appendHeaderCartLink(nav) {
   const link = document.createElement("a");
-  link.href = href;
-  link.textContent = label;
+  link.href = "/carrinho/";
+  link.className = "header-cart-link";
   link.dataset.authDynamic = "true";
-  link.dataset[datasetKey] = "true";
+  link.dataset.cartLink = "true";
+  link.setAttribute("aria-label", "Carrinho");
+
+  const badge = document.createElement("span");
+  badge.className = "header-cart-badge";
+  badge.dataset.cartBadge = "true";
+  badge.hidden = true;
+
+  link.append(createHeaderCartIcon(), badge);
   nav.append(link);
+}
+
+async function loadHeaderCartQuantity() {
+  const supabase = await getSupabaseClient();
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) throw sessionError;
+  if (!sessionData.session?.user) return 0;
+
+  const { data, error } = await supabase.rpc("shopping_carrinho_atual");
+  if (error) throw error;
+
+  return (data || []).reduce((total, item) => total + Number(item.quantidade || 0), 0);
+}
+
+export async function updateHeaderCartBadge() {
+  const link = document.querySelector("[data-cart-link]");
+  const badge = document.querySelector("[data-cart-badge]");
+  if (!link || !badge) return;
+
+  const requestId = ++cartBadgeRequestId;
+  try {
+    const quantity = await loadHeaderCartQuantity();
+    if (requestId !== cartBadgeRequestId) return;
+
+    badge.hidden = quantity <= 0;
+    badge.textContent = quantity > 0 ? String(quantity) : "";
+    link.setAttribute(
+      "aria-label",
+      quantity > 0
+        ? `Carrinho, ${quantity} ${quantity === 1 ? "item" : "itens"}`
+        : "Carrinho"
+    );
+  } catch (error) {
+    if (requestId !== cartBadgeRequestId) return;
+
+    badge.hidden = true;
+    badge.textContent = "";
+    link.setAttribute("aria-label", "Carrinho");
+    console.warn(error.message);
+  }
 }
 
 function renderAuthNavigationState(nav, loginLinks, adminLink, state) {
   const signature = authNavigationSignature(state);
   if (signature === lastAuthNavigationSignature) {
     writeAuthNavigationCache(state);
+    if (state.status === "authenticated") {
+      updateHeaderCartBadge();
+    }
     return;
   }
 
@@ -642,8 +725,7 @@ function renderAuthNavigationState(nav, loginLinks, adminLink, state) {
     adminLink.hidden = !canAccessAdmin(profile);
   }
 
-  appendAuthenticatedLink(nav, "/pedidos/", "Pedidos", "ordersLink");
-  appendAuthenticatedLink(nav, "/carrinho/", "Carrinho", "cartLink");
+  appendHeaderCartLink(nav);
   mountUserMenu(nav, {
     profile,
     session,
@@ -653,6 +735,7 @@ function renderAuthNavigationState(nav, loginLinks, adminLink, state) {
       window.location.href = "/login/";
     },
   });
+  updateHeaderCartBadge();
   writeAuthNavigationCache(state);
 }
 
@@ -703,6 +786,13 @@ export async function initAuthNavigation() {
         .catch((error) => console.warn(error.message));
     });
     authNavigationSubscription = data?.subscription || null;
+    if (cartBadgeRefreshHandler) {
+      window.removeEventListener(HEADER_CART_REFRESH_EVENT, cartBadgeRefreshHandler);
+    }
+    cartBadgeRefreshHandler = () => {
+      updateHeaderCartBadge();
+    };
+    window.addEventListener(HEADER_CART_REFRESH_EVENT, cartBadgeRefreshHandler);
   } catch (error) {
     console.warn(error.message);
   }

@@ -147,6 +147,57 @@ textarea {
   color: var(--text-primary);
 }
 
+.top-nav .header-cart-link {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-color: var(--border-soft);
+  border-radius: 50%;
+  padding: 0;
+  color: var(--text-secondary);
+  background: rgba(25, 221, 218, 0.045);
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.top-nav .header-cart-link:hover,
+.top-nav .header-cart-link:focus-visible,
+.top-nav .header-cart-link[aria-current="page"] {
+  border-color: var(--border);
+  background: rgba(25, 221, 218, 0.1);
+  color: var(--accent);
+  outline: none;
+}
+
+.header-cart-icon {
+  width: 22px;
+  height: 22px;
+  display: block;
+  pointer-events: none;
+}
+
+.header-cart-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 19px;
+  height: 19px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid rgba(3, 13, 20, 0.94);
+  border-radius: 999px;
+  padding: 0 5px;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-size: 0.68rem;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: 0 0 14px rgba(25, 221, 218, 0.28);
+}
+
 .user-menu {
   position: relative;
   display: inline-flex;
@@ -2154,6 +2205,22 @@ textarea {
   .top-nav a {
     padding: 8px 9px;
     font-size: 0.8rem;
+  }
+
+  .top-nav .header-cart-link {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+  }
+
+  .header-cart-icon {
+    width: 21px;
+    height: 21px;
+  }
+
+  .header-cart-badge {
+    top: -3px;
+    right: -3px;
   }
 
   .user-menu-dropdown {

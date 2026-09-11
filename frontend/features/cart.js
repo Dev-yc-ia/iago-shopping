@@ -3,8 +3,14 @@ import { createProductImage } from "../ui/productImage.js";
 import { recordEvent } from "../utils/analytics.js";
 import { formatCurrency } from "../utils/format.js";
 
+const CART_UPDATED_EVENT = "iago:cart:updated";
+
 function currentRelativeUrl() {
   return `/carrinho/${window.location.search}`;
+}
+
+function notifyCartChanged() {
+  window.dispatchEvent(new CustomEvent(CART_UPDATED_EVENT));
 }
 
 function redirectToCartLogin() {
@@ -74,6 +80,7 @@ export async function addProductToCart(productId, quantity = 1, variationId = nu
   if (error) throw error;
 
   recordEvent("cart_add", { productId, variationId, quantity });
+  notifyCartChanged();
   return true;
 }
 
@@ -91,6 +98,7 @@ async function updateCartItemQuantity(itemId, quantity) {
     p_quantidade: quantity,
   });
   if (error) throw error;
+  notifyCartChanged();
 }
 
 async function removeCartItem(itemId) {
@@ -101,6 +109,7 @@ async function removeCartItem(itemId) {
     p_item_id: itemId,
   });
   if (error) throw error;
+  notifyCartChanged();
 }
 
 async function finalizeCartOrder() {
@@ -112,6 +121,7 @@ async function finalizeCartOrder() {
 
   const order = Array.isArray(data) ? data[0] : data;
   recordEvent("order_create", { orderId: order?.id });
+  notifyCartChanged();
   return order;
 }
 
