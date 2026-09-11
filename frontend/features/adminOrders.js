@@ -54,7 +54,7 @@ function normalizeAdminOrder(order) {
     status: order.status,
     paymentStatus: order.pagamento_status || "pendente",
     paymentId: order.pagamento_id || null,
-    paymentProvider: order.pagamento_provedor || "mock",
+    paymentProvider: order.pagamento_provedor || "",
     paymentProviderMode: order.pagamento_provider_mode || "",
     paymentProviderPaymentId: order.pagamento_provider_payment_id || "",
     paymentProviderStatus: order.pagamento_provider_status || "",
@@ -70,6 +70,12 @@ function normalizeAdminOrder(order) {
     createdAt: order.criado_em,
     items,
   };
+}
+
+function paymentProviderLabel(provider) {
+  if (provider === "mercado_pago") return "Mercado Pago";
+  if (provider === "mock") return "Provider histórico";
+  return provider || "Provider não informado";
 }
 
 function normalizePartnerOrder(order) {
@@ -220,7 +226,7 @@ function renderAdminOrder(order, handlers) {
   items.textContent = `${order.items.length} item${order.items.length === 1 ? "" : "s"} no pedido.`;
 
   const payment = document.createElement("p");
-  payment.textContent = `${order.paymentProvider}${order.paymentProviderMode ? `/${order.paymentProviderMode}` : ""} | ${PAYMENT_METHOD_LABELS[order.paymentMethod] || order.paymentMethod}`;
+  payment.textContent = `${paymentProviderLabel(order.paymentProvider)}${order.paymentProviderMode ? `/${order.paymentProviderMode}` : ""} | ${PAYMENT_METHOD_LABELS[order.paymentMethod] || order.paymentMethod}`;
 
   const note = document.createElement("p");
   note.className = "extension-note";
@@ -318,7 +324,7 @@ function renderAdminPayment(payment) {
   customer.textContent = `${payment.cliente_nome || "Cliente"} | ${payment.cliente_email || "E-mail não informado"}`;
 
   const method = document.createElement("p");
-  method.textContent = `${payment.provedor}${payment.provider_mode ? `/${payment.provider_mode}` : ""} | ${PAYMENT_METHOD_LABELS[payment.metodo] || payment.metodo}`;
+  method.textContent = `${paymentProviderLabel(payment.provedor)}${payment.provider_mode ? `/${payment.provider_mode}` : ""} | ${PAYMENT_METHOD_LABELS[payment.metodo] || payment.metodo}`;
 
   const providerTrace = document.createElement("p");
   providerTrace.textContent = payment.provider_payment_id
@@ -329,7 +335,7 @@ function renderAdminPayment(payment) {
   total.textContent = formatCurrency(payment.valor);
 
   const trace = document.createElement("p");
-  trace.textContent = `${payment.eventos} evento${payment.eventos === 1 ? "" : "s"} | ${payment.emails} e-mail${payment.emails === 1 ? "" : "s"} simulado${payment.emails === 1 ? "" : "s"}`;
+  trace.textContent = `${payment.eventos} evento${payment.eventos === 1 ? "" : "s"} | ${payment.emails} notificaç${payment.emails === 1 ? "ão" : "ões"} operacional${payment.emails === 1 ? "" : "is"}`;
 
   const error = document.createElement("p");
   error.className = "extension-note";
@@ -339,11 +345,10 @@ function renderAdminPayment(payment) {
   return card;
 }
 
-export async function initAdminOrders({ role = "", isMaster = false } = {}) {
-  const container = document.querySelector("[data-admin-orders]");
-  const feedback = document.querySelector("[data-admin-orders-feedback]");
-  const paymentsContainer = document.querySelector("[data-admin-payments]");
-  const paymentsFeedback = document.querySelector("[data-admin-payments-feedback]");
+export async function initAdminOrders({ role = "", isMaster = false, module = "orders" } = {}) {
+  const isDeliveriesModule = module === "deliveries";
+  const container = document.querySelector(isDeliveriesModule ? "[data-admin-deliveries]" : "[data-admin-orders]");
+  const feedback = document.querySelector(isDeliveriesModule ? "[data-admin-deliveries-feedback]" : "[data-admin-orders-feedback]");
   if (!container) return;
   let paymentEngine = null;
   let processingOrderId = "";
@@ -360,6 +365,7 @@ export async function initAdminOrders({ role = "", isMaster = false } = {}) {
     button.disabled = true;
     button.textContent = "Cancelando...";
     try {
+      paymentEngine = paymentEngine || await getPaymentEngineMetadata();
       await cancelAdminOrder(order, motivo.trim(), paymentEngine);
       processingOrderId = "";
       await refresh();
@@ -378,13 +384,12 @@ export async function initAdminOrders({ role = "", isMaster = false } = {}) {
       if (feedback) {
         feedback.textContent = `${orders.length} entrega${orders.length === 1 ? "" : "s"} em acompanhamento.`;
       }
-      paymentsContainer?.replaceChildren();
-      if (paymentsFeedback) paymentsFeedback.textContent = "";
-
       if (!orders.length) {
         const empty = document.createElement("div");
         empty.className = "empty-state";
-        empty.textContent = "Nenhum pedido pago dos seus produtos por enquanto.";
+        empty.textContent = isDeliveriesModule
+          ? "Nenhuma entrega dos seus produtos por enquanto."
+          : "Nenhum pedido pago dos seus produtos por enquanto.";
         container.replaceChildren(empty);
         return;
       }
@@ -396,17 +401,11 @@ export async function initAdminOrders({ role = "", isMaster = false } = {}) {
       return;
     }
 
-    const [orders, payments, engine] = await Promise.all([
-      loadAdminOrders(),
-      loadAdminPayments(),
-      getPaymentEngineMetadata(),
-    ]);
-    paymentEngine = engine;
+    const orders = await loadAdminOrders();
     if (feedback) {
-      feedback.textContent = `${orders.length} pedido${orders.length === 1 ? "" : "s"} recebido${orders.length === 1 ? "" : "s"}.`;
-    }
-    if (paymentsFeedback) {
-      paymentsFeedback.textContent = `${payments.length} tentativa${payments.length === 1 ? "" : "s"} de pagamento.`;
+      feedback.textContent = isDeliveriesModule
+        ? `${orders.length} pedido${orders.length === 1 ? "" : "s"} com entrega mapeada${orders.length === 1 ? "" : "s"}.`
+        : `${orders.length} pedido${orders.length === 1 ? "" : "s"} recebido${orders.length === 1 ? "" : "s"}.`;
     }
 
     if (!orders.length) {
@@ -422,16 +421,6 @@ export async function initAdminOrders({ role = "", isMaster = false } = {}) {
       processingOrderId,
       onCancelOrder,
     })));
-    if (paymentsContainer) {
-      if (!payments.length) {
-        const emptyPayments = document.createElement("div");
-        emptyPayments.className = "empty-state";
-        emptyPayments.textContent = "Nenhum pagamento simulado até agora.";
-        paymentsContainer.replaceChildren(emptyPayments);
-      } else {
-        paymentsContainer.replaceChildren(...payments.map(renderAdminPayment));
-      }
-    }
   }
 
   async function onConfirmDelivery(order, method, button) {
@@ -458,8 +447,32 @@ export async function initAdminOrders({ role = "", isMaster = false } = {}) {
     await refresh();
   } catch (error) {
     if (feedback) feedback.textContent = error.message;
-    if (paymentsFeedback) paymentsFeedback.textContent = error.message;
     container.replaceChildren();
-    paymentsContainer?.replaceChildren();
+  }
+}
+
+export async function initAdminPayments() {
+  const container = document.querySelector("[data-admin-payments]");
+  const feedback = document.querySelector("[data-admin-payments-feedback]");
+  if (!container) return;
+
+  try {
+    const payments = (await loadAdminPayments()).filter((payment) => payment.provedor !== "mock");
+    if (feedback) {
+      feedback.textContent = `${payments.length} pagamento${payments.length === 1 ? "" : "s"} real${payments.length === 1 ? "" : "is"} encontrado${payments.length === 1 ? "" : "s"}.`;
+    }
+
+    if (!payments.length) {
+      const empty = document.createElement("div");
+      empty.className = "empty-state";
+      empty.textContent = "Nenhum pagamento real encontrado.";
+      container.replaceChildren(empty);
+      return;
+    }
+
+    container.replaceChildren(...payments.map(renderAdminPayment));
+  } catch (error) {
+    if (feedback) feedback.textContent = error.message;
+    container.replaceChildren();
   }
 }

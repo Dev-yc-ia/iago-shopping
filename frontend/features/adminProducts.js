@@ -332,7 +332,7 @@ async function saveProduct(product) {
   const imagens = uploadedImages.length ? uploadedImages : product.imagens;
 
   try {
-    const { error } = await supabase.rpc("shopping_admin_salvar_produto_com_variacoes", {
+    const { data, error } = await supabase.rpc("shopping_admin_salvar_produto_com_variacoes", {
       p_id: product.id,
       p_nome: product.nome,
       p_marca: product.marca,
@@ -348,6 +348,7 @@ async function saveProduct(product) {
       p_valor_repasse_parceiro: product.valorRepasseParceiro === "" ? null : Number(product.valorRepasseParceiro),
     });
     if (error) throw error;
+    return data;
   } catch (error) {
     await removeUploadedPhotosOnFailure(supabase, uploadedImages);
     throw error;
@@ -504,7 +505,11 @@ function renderVariationRows(form, variations = [DEFAULT_VARIATION]) {
     name.addEventListener("input", () => updateLivePreview(form));
     stock.addEventListener("input", () => updateLivePreview(form));
 
-    row.append(name, stock, remove);
+    row.append(
+      variationField("Tamanho/Variação", name),
+      variationField("Estoque", stock),
+      remove,
+    );
     return row;
   }));
 
@@ -518,6 +523,18 @@ function updateVariationRemoveButtons(form) {
       || row.querySelector(".variation-editor__remove");
     if (remove) remove.disabled = rows.length <= 1;
   });
+}
+
+function variationField(labelText, control) {
+  const label = document.createElement("label");
+  label.className = "variation-editor__field";
+
+  const labelSpan = document.createElement("span");
+  labelSpan.textContent = labelText;
+  control.setAttribute("aria-label", labelText);
+
+  label.append(labelSpan, control);
+  return label;
 }
 
 function fillProductForm(form, product = EMPTY_PRODUCT) {
@@ -595,9 +612,75 @@ function updateCommercialPreview(form) {
   marginPreview.textContent = `Margem IAGO: ${formatCurrency(margin)}`;
 }
 
-function renderProductCard(product, onEdit, onDelete) {
+function isMasterProfile(profile) {
+  return profile?.papel === "master";
+}
+
+function isPartnerProfile(profile) {
+  return profile?.papel === "parceiro";
+}
+
+function currentProductIdFromUrl() {
+  return new URLSearchParams(window.location.search).get("id") || "";
+}
+
+function productEditUrl(product) {
+  return `/admin/produtos/editar/?id=${encodeURIComponent(product.id)}`;
+}
+
+function setFieldGroupHidden(control, hidden) {
+  const group = control?.closest("[data-admin-field]");
+  if (group) group.hidden = hidden;
+}
+
+function renderSelfPartnerOption(form, profile) {
+  const select = form.elements.parceiroUserId;
+  if (!select) return;
+
+  select.replaceChildren();
+  const option = document.createElement("option");
+  option.value = profile.user_id;
+  option.textContent = partnerLabel(profile);
+  option.selected = true;
+  select.append(option);
+}
+
+function applyProductFormRole(profile, form, product = EMPTY_PRODUCT) {
+  const isMaster = isMasterProfile(profile);
+  const isPartner = isPartnerProfile(profile);
+  const partnerSelect = form.elements.parceiroUserId;
+  const payoutInput = form.elements.valorRepasseParceiro;
+  const statusSelect = form.elements.status;
+
+  setFieldGroupHidden(partnerSelect, false);
+  setFieldGroupHidden(payoutInput, false);
+
+  if (isPartner) {
+    renderSelfPartnerOption(form, profile);
+    if (partnerSelect) partnerSelect.disabled = true;
+    if (payoutInput) {
+      payoutInput.value = product.valor_repasse_parceiro ?? "";
+      payoutInput.disabled = true;
+      payoutInput.placeholder = "Definido pelo Master";
+    }
+    if (statusSelect && product.status !== "publicado") {
+      statusSelect.value = "rascunho";
+    }
+    Array.from(statusSelect?.options || []).forEach((option) => {
+      option.disabled = option.value === "publicado";
+    });
+  } else {
+    if (partnerSelect) partnerSelect.disabled = !isMaster;
+    if (payoutInput) payoutInput.disabled = !isMaster;
+    Array.from(statusSelect?.options || []).forEach((option) => {
+      option.disabled = false;
+    });
+  }
+}
+
+function renderProductCard(product, onDelete, profile = null) {
   const card = document.createElement("article");
-  card.className = "admin-card";
+  card.className = "admin-card admin-product-card";
 
   const status = document.createElement("span");
   status.className = "card-kicker";
@@ -611,7 +694,7 @@ function renderProductCard(product, onEdit, onDelete) {
 
   const commercial = document.createElement("p");
   commercial.className = product.comercial_configurado ? "extension-note" : "extension-note product-commercial-warning";
-  commercial.textContent = product.comercial_configurado
+  commercial.textContent = product.comercial_configurado || isPartnerProfile(profile)
     ? `Parceiro: ${product.parceiro_nome || product.parceiro_email || "ativo"} | Repasse ${formatCurrency(product.valor_repasse_parceiro)}`
     : "Configuração comercial pendente: parceiro e repasse obrigatórios para publicar.";
 
@@ -624,11 +707,13 @@ function renderProductCard(product, onEdit, onDelete) {
   });
   card.append(image);
 
-  const editButton = document.createElement("button");
+  const actions = document.createElement("div");
+  actions.className = "admin-card-actions";
+
+  const editButton = document.createElement("a");
   editButton.className = "button secondary";
-  editButton.type = "button";
+  editButton.href = productEditUrl(product);
   editButton.textContent = "Editar";
-  editButton.addEventListener("click", () => onEdit(product));
 
   const deleteButton = document.createElement("button");
   deleteButton.className = "button ghost";
@@ -636,48 +721,22 @@ function renderProductCard(product, onEdit, onDelete) {
   deleteButton.textContent = "Excluir";
   deleteButton.addEventListener("click", () => onDelete(product.id));
 
-  card.append(status, title, description, commercial, editButton, deleteButton);
+  actions.append(editButton, deleteButton);
+  card.append(status, title, description, commercial, actions);
   return card;
 }
 
-export function initAdminProducts() {
-  const form = document.querySelector("[data-product-form]");
-  const list = document.querySelector("[data-products-list]");
-  const feedback = document.querySelector("[data-product-feedback]");
-
-  if (!form || !list) return;
-
-  async function refreshProducts() {
-    try {
-      const [products, partners] = await Promise.all([listProducts(), listActivePartners()]);
-      activePartners = partners;
-      renderPartnerOptions(form);
-      list.replaceChildren(
-        ...products.map((product) => renderProductCard(product, fillProductForm.bind(null, form), async (id) => {
-          try {
-            await deleteProduct(id);
-            fillProductForm(form);
-            await refreshProducts();
-          } catch (error) {
-            if (feedback) feedback.textContent = error.message;
-          }
-        })),
-      );
-      if (feedback) {
-        feedback.textContent = `${products.length} produto${products.length === 1 ? "" : "s"} cadastrado${products.length === 1 ? "" : "s"}.`;
-      }
-    } catch (error) {
-      if (feedback) feedback.textContent = error.message;
-    }
-  }
+function bindProductForm(form, feedback, profile, onSaved) {
+  if (form.dataset.productFormBound) return;
+  form.dataset.productFormBound = "true";
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     try {
       const product = readProductForm(form);
       await saveProduct(product);
-      fillProductForm(form);
-      await refreshProducts();
+      if (feedback) feedback.textContent = "Produto salvo. Se for cadastro de parceiro, ele fica em revisão comercial até validação Master.";
+      onSaved?.();
     } catch (error) {
       if (feedback) feedback.textContent = error.message;
     }
@@ -724,7 +783,11 @@ export function initAdminProducts() {
     name.addEventListener("input", () => updateLivePreview(form));
     stock.addEventListener("input", () => updateLivePreview(form));
 
-    next.append(name, stock, remove);
+    next.append(
+      variationField("Tamanho/Variação", name),
+      variationField("Estoque", stock),
+      remove,
+    );
     rows?.append(next);
     updateVariationRemoveButtons(form);
     name.focus();
@@ -732,8 +795,94 @@ export function initAdminProducts() {
 
   form.querySelector("[data-product-reset]")?.addEventListener("click", () => {
     fillProductForm(form);
+    applyProductFormRole(profile, form);
+  });
+}
+
+export function initAdminProductsList({ profile = null } = {}) {
+  const list = document.querySelector("[data-products-list]");
+  const feedback = document.querySelector("[data-product-feedback]");
+
+  if (!list) return;
+
+  async function refreshProducts() {
+    try {
+      const products = await listProducts();
+      list.replaceChildren(
+        ...products.map((product) => renderProductCard(product, async (id) => {
+          try {
+            await deleteProduct(id);
+            await refreshProducts();
+          } catch (error) {
+            if (feedback) feedback.textContent = error.message;
+          }
+        }, profile)),
+      );
+      if (feedback) {
+        const prefix = isPartnerProfile(profile) ? "seu" : "cadastrado";
+        feedback.textContent = `${products.length} produto${products.length === 1 ? "" : "s"} ${prefix}${products.length === 1 ? "" : "s"}.`;
+      }
+      if (!products.length) {
+        const empty = document.createElement("div");
+        empty.className = "empty-state";
+        empty.textContent = isPartnerProfile(profile)
+          ? "Nenhum produto seu por enquanto."
+          : "Nenhum produto cadastrado por enquanto.";
+        list.replaceChildren(empty);
+      }
+    } catch (error) {
+      if (feedback) feedback.textContent = error.message;
+      list.replaceChildren();
+    }
+  }
+
+  refreshProducts();
+}
+
+export function initAdminProductForm({ profile = null } = {}) {
+  const form = document.querySelector("[data-product-form]");
+  const feedback = document.querySelector("[data-product-feedback]");
+
+  if (!form) return;
+
+  async function loadForm() {
+    try {
+      let product = EMPTY_PRODUCT;
+      if (isMasterProfile(profile)) {
+        activePartners = await listActivePartners();
+        renderPartnerOptions(form);
+      } else {
+        activePartners = [];
+      }
+
+      const productId = currentProductIdFromUrl();
+      if (productId) {
+        const products = await listProducts();
+        product = products.find((item) => item.id === productId);
+        if (!product) throw new Error("Produto não encontrado ou sem permissão para edição.");
+      }
+
+      fillProductForm(form, product || EMPTY_PRODUCT);
+      applyProductFormRole(profile, form, product || EMPTY_PRODUCT);
+      if (feedback) {
+        feedback.textContent = productId
+          ? "Editando produto."
+          : "Novo produto. Parceiros salvam como rascunho para revisão comercial.";
+      }
+    } catch (error) {
+      if (feedback) feedback.textContent = error.message;
+    }
+  }
+
+  bindProductForm(form, feedback, profile, () => {
+    fillProductForm(form);
+    applyProductFormRole(profile, form);
   });
 
-  fillProductForm(form);
-  refreshProducts();
+  loadForm();
+}
+
+export function initAdminProducts({ profile = null } = {}) {
+  if (document.querySelector("[data-product-form]")) initAdminProductForm({ profile });
+  if (document.querySelector("[data-products-list]")) initAdminProductsList({ profile });
 }

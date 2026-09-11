@@ -70,6 +70,10 @@ def create_app() -> FastAPI:
         def frontend_clean_page(page_name: str) -> FileResponse:
             return FileResponse(frontend_routes.get(page_name, FRONTEND_DIR / "index.html"))
 
+        @app.get("/admin/{module_path:path}", include_in_schema=False)
+        def frontend_admin_module(module_path: str) -> FileResponse:
+            return FileResponse(frontend_routes["admin"])
+
     return app
 
 
