@@ -5,17 +5,24 @@ import { cancelMercadoPagoPayment, isMercadoPagoProvider } from "../_shared/merc
 Deno.serve((request) => withCors(request, async () => {
   assertMethod(request, ["POST"]);
 
+  console.info("[PAY-CANCEL-01] request_received", { method: request.method });
+
   const payload = await readJsonBody(request);
   const paymentId = String(payload.payment_id || "");
   const providerPaymentId = String(payload.provider_payment_id || "");
   if (!paymentId) throw new HttpError(400, "Pagamento obrigatório para cancelamento.");
 
   const { supabase } = await userSupabaseClient(request);
+  console.info("[PAY-CANCEL-02] auth_ok", { ok: true });
   let providerResult: Record<string, unknown> | null = null;
 
   if (isMercadoPagoProvider() && providerPaymentId) {
     providerResult = await cancelMercadoPagoPayment(providerPaymentId);
     const providerStatus = String(providerResult.provider_status || "").toLowerCase();
+    console.info("[PAY-CANCEL-03] provider_cancel", {
+      provider_status: providerStatus || "VAZIO",
+      http_status: providerResult.http_status || "VAZIO",
+    });
 
     if (providerStatus && !["cancelled", "canceled"].includes(providerStatus)) {
       await callRpc(supabase, "shopping_pagamento_mercado_pago_sincronizar_consulta", {

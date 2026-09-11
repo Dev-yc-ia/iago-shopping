@@ -8,6 +8,8 @@ Deno.serve((request) => withCors(request, async () => {
     throw new HttpError(400, "Provider ativo não usa checkout externo.");
   }
 
+  console.info("[PAY-01] request_received", { method: request.method });
+
   const payload = await readJsonBody(request);
   const orderId = String(payload.order_id || "");
   const method = String(payload.method || "pix");
@@ -18,14 +20,18 @@ Deno.serve((request) => withCors(request, async () => {
   if (!orderId) throw new HttpError(400, "Pedido obrigatório para checkout.");
 
   const { supabase } = await userSupabaseClient(request);
+  console.info("[PAY-02] auth_ok", { ok: true });
   const context = firstRow(await callRpc(supabase, "shopping_pagamento_checkout_context", {
     p_pedido_id: orderId,
   }));
   if (!Object.keys(context).length) {
+    console.info("[PAY-03] order_ok", { found: false });
     throw new HttpError(404, "Pedido não encontrado para checkout.");
   }
+  console.info("[PAY-03] order_ok", { found: true });
 
   const providerResult = await createMercadoPagoPayment(context, method, cardPayload);
+  console.info("[PAY-04] config_ok", { provider_mode: providerResult.provider_mode });
   let payment = firstRow(await callRpc(supabase, "shopping_pagamento_mercado_pago_registrar_checkout", {
     p_pedido_id: orderId,
     p_metodo: method,
@@ -61,6 +67,7 @@ Deno.serve((request) => withCors(request, async () => {
     }));
   }
 
+  console.info("[PAY-09] response_returned", { ok: true });
   return jsonResponse(request, {
     payment,
     provider_payload: providerResult.response_payload,

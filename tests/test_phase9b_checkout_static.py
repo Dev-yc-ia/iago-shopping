@@ -167,6 +167,29 @@ def test_web05_frontend_uses_supabase_edge_functions_for_payments():
     assert 'fetch(endpoint' not in payments
 
 
+def test_web15_payment_edges_send_user_jwt_and_log_safe_diagnostics():
+    payments = (ROOT / "frontend" / "features" / "payments.js").read_text(encoding="utf-8")
+    supabase = (ROOT / "supabase" / "functions" / "_shared" / "supabase.ts").read_text(encoding="utf-8")
+    mercado_pago = (ROOT / "supabase" / "functions" / "_shared" / "mercado_pago.ts").read_text(encoding="utf-8")
+
+    assert "Authorization: `Bearer ${session.access_token}`" in payments
+    assert "[IAGO Payment][AUTH-FE] session_ready" in payments
+    assert "[AUTH-01] auth_header_present" in supabase
+    assert "[AUTH-03] jwt_validation" in supabase
+    assert "authClient.auth.getUser(userJwt)" in supabase
+    assert "supabaseSecretKeySource" in supabase
+    assert "[AUTH-CONFIG]" in supabase
+    assert "admin_key_source" in supabase
+    assert "project_ref" in supabase
+    assert "[AUTH-03] jwt_validation_failed" in supabase
+    assert "message: typeof details.message" in supabase
+    assert "status: typeof details.status" in supabase
+    assert "code: typeof details.code" in supabase
+    assert "[MP-01] credential" in mercado_pago
+    assert "same_after_trim" in mercado_pago
+    assert "assertProviderEnvironment" in mercado_pago
+
+
 def test_web05_backend_cors_and_env_example_are_production_ready():
     settings = (ROOT / "backend" / "config" / "settings.py").read_text(encoding="utf-8")
     main = MAIN_PY.read_text(encoding="utf-8")
@@ -185,6 +208,9 @@ def test_web05_backend_cors_and_env_example_are_production_ready():
 
 def test_web05_edge_function_structure_and_auth_policy():
     config = (ROOT / "supabase" / "config.toml").read_text(encoding="utf-8")
+    create = (ROOT / "supabase" / "functions" / "payment-create" / "index.ts").read_text(encoding="utf-8")
+    sync = (ROOT / "supabase" / "functions" / "payment-sync" / "index.ts").read_text(encoding="utf-8")
+    cancel = (ROOT / "supabase" / "functions" / "payment-cancel" / "index.ts").read_text(encoding="utf-8")
 
     for function_name in [
         "payment-engine",
@@ -200,8 +226,14 @@ def test_web05_edge_function_structure_and_auth_policy():
     assert "[functions.payment-sync]" in config
     assert "[functions.payment-cancel]" in config
     assert "[functions.mercado-pago-webhook]" in config
-    assert "verify_jwt = true" in config
-    assert config.count("verify_jwt = false") == 2
+    assert "[functions.payment-create]\nverify_jwt = false" in config
+    assert "[functions.payment-sync]\nverify_jwt = false" in config
+    assert "[functions.payment-cancel]\nverify_jwt = false" in config
+    assert "userSupabaseClient(request)" in create
+    assert "userSupabaseClient(request)" in sync
+    assert "userSupabaseClient(request)" in cancel
+    assert "verify_jwt = true" not in config
+    assert config.count("verify_jwt = false") == 5
 
 
 def test_web05_edge_functions_preserve_rpc_mapping_and_payloads():

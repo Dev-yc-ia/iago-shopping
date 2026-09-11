@@ -6,8 +6,12 @@ const EMPTY_LOG_VALUE = "VAZIO";
 
 type JsonRecord = Record<string, unknown>;
 
+function rawEnv(name: string): string {
+  return Deno.env.get(name) || "";
+}
+
 function env(name: string): string {
-  return Deno.env.get(name)?.trim() || "";
+  return rawEnv(name).trim();
 }
 
 function asRecord(value: unknown): JsonRecord {
@@ -52,6 +56,34 @@ function maskHeaders(headers: JsonRecord): JsonRecord {
       return [key, value || EMPTY_LOG_VALUE];
     }),
   );
+}
+
+function credentialEnvironment(value: string): string {
+  const normalized = value.trim().toUpperCase();
+  if (normalized.startsWith("APP_USR")) return "production";
+  if (normalized.startsWith("TEST")) return "test";
+  return "unknown";
+}
+
+function credentialDiagnostic(name: string): JsonRecord {
+  const raw = rawEnv(name);
+  const trimmed = raw.trim();
+  return {
+    source: `edge-secret:${name}`,
+    present: Boolean(trimmed),
+    same_after_trim: raw === trimmed,
+    environment: credentialEnvironment(trimmed),
+  };
+}
+
+function assertProviderEnvironment(accessTokenEnvironment: string): void {
+  const provider = providerMode();
+  if (provider === "prod" && accessTokenEnvironment === "test") {
+    throw new HttpError(503, "MERCADO_PAGO_ACCESS_TOKEN de teste configurado com provider de produção.");
+  }
+  if (provider === "sandbox" && accessTokenEnvironment === "production") {
+    throw new HttpError(503, "MERCADO_PAGO_ACCESS_TOKEN de produção configurado com provider sandbox.");
+  }
 }
 
 export function providerMode(): string {
@@ -167,9 +199,13 @@ async function mercadoPagoRequest(
   options: { method?: string; payload?: JsonRecord; idempotencyKey?: string } = {},
 ): Promise<{ payload: JsonRecord; headers: JsonRecord; status: number; elapsedMs: number }> {
   const accessToken = env("MERCADO_PAGO_ACCESS_TOKEN");
+  const diagnostic = credentialDiagnostic("MERCADO_PAGO_ACCESS_TOKEN");
+  console.info("[MP-01] credential", diagnostic);
+
   if (!accessToken) {
     throw new HttpError(503, "MERCADO_PAGO_ACCESS_TOKEN não está configurado nas Secrets da Edge Function.");
   }
+  assertProviderEnvironment(String(diagnostic.environment || "unknown"));
 
   const method = options.method || "GET";
   const headers: Record<string, string> = {
@@ -189,6 +225,7 @@ async function mercadoPagoRequest(
     payload: maskPayload(options.payload || {}),
   });
 
+  console.info("[MP-05] provider_auth_start", { provider: providerMode(), path, method });
   const response = await fetch(`${MERCADO_PAGO_API_BASE}${path}`, {
     method,
     headers,
@@ -198,6 +235,7 @@ async function mercadoPagoRequest(
   const responsePayload = await parseJsonResponse(response);
   const responseHeaders = Object.fromEntries(response.headers.entries());
 
+  console.info("[MP-06] provider_auth_status", { http_status: response.status });
   console.info("[IAGO Edge Mercado Pago] response", {
     provider: providerMode(),
     path,

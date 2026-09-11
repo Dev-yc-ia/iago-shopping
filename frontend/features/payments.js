@@ -73,9 +73,16 @@ async function edgePaymentRequest(functionName, payload) {
     throw new Error("Faça login para iniciar o pagamento.");
   }
 
+  console.info("[IAGO Payment][AUTH-FE] session_ready", {
+    session_present: true,
+    access_token_present: true,
+    expires_at_present: Boolean(session.expires_at),
+  });
+
   const supabase = await getSupabaseClient();
   const { data, error } = await supabase.functions.invoke(functionName, {
     body: payload,
+    headers: { Authorization: `Bearer ${session.access_token}` },
   });
   if (error) {
     throw new Error(await edgeFunctionErrorMessage(error));
