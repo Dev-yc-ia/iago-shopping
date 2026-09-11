@@ -25,6 +25,8 @@ export function setProductImage(
   image.className = "product-image__media";
   image.src = src;
   image.alt = alt;
+  image.loading = variant === "catalog" ? "lazy" : "eager";
+  image.decoding = variant === "catalog" ? "async" : "sync";
   container.replaceChildren(image);
   return container;
 }

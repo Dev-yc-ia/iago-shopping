@@ -703,6 +703,70 @@ textarea {
   margin: 12px 12px 0;
 }
 
+.product-card-media {
+  position: relative;
+  min-width: 0;
+}
+
+.product-card-gallery-button {
+  position: absolute;
+  z-index: 2;
+  top: calc(50% + 6px);
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(25, 221, 218, 0.56);
+  border-radius: 999px;
+  padding: 0;
+  background: rgba(3, 13, 20, 0.78);
+  color: var(--text-primary);
+  cursor: pointer;
+  transform: translateY(-50%);
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+  touch-action: manipulation;
+}
+
+.product-card-gallery-button__icon {
+  width: 18px;
+  height: 18px;
+  display: block;
+  pointer-events: none;
+}
+
+.product-card-gallery-button:hover,
+.product-card-gallery-button:focus-visible {
+  border-color: var(--accent);
+  background: rgba(25, 221, 218, 0.16);
+  color: var(--accent);
+  outline: none;
+}
+
+.product-card-gallery-button--prev {
+  left: 18px;
+}
+
+.product-card-gallery-button--next {
+  right: 18px;
+}
+
+.product-card-gallery-counter {
+  position: absolute;
+  z-index: 1;
+  right: 18px;
+  bottom: 8px;
+  min-width: 38px;
+  padding: 4px 7px;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  background: rgba(3, 13, 20, 0.72);
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+  font-weight: 850;
+  text-align: center;
+}
+
 .product-admin-column {
   display: grid;
   gap: 18px;
@@ -2005,6 +2069,33 @@ textarea {
 
   .catalog-layout.filters-collapsed .product-grid.is-full-page .product-image--catalog {
     height: 168px;
+  }
+
+  .product-card-gallery-button {
+    top: calc(50% + 6px);
+    width: 30px;
+    height: 30px;
+  }
+
+  .product-card-gallery-button__icon {
+    width: 16px;
+    height: 16px;
+  }
+
+  .product-card-gallery-button--prev {
+    left: 16px;
+  }
+
+  .product-card-gallery-button--next {
+    right: 16px;
+  }
+
+  .product-card-gallery-counter {
+    right: 16px;
+    bottom: 7px;
+    min-width: 34px;
+    padding: 3px 6px;
+    font-size: 0.62rem;
   }
 
   .product-grid .product-card .product-meta {
