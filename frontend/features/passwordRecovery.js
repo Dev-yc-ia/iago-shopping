@@ -10,6 +10,7 @@ const GENERIC_RECOVERY_MESSAGE =
 function setMessage(element, message) {
   if (element) {
     element.textContent = message;
+    element.hidden = !message;
   }
 }
 
