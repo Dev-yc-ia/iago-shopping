@@ -16,6 +16,18 @@ export function initEntryPage() {
     }
   });
 
+  document.querySelector(".entry-password-toggle")?.addEventListener("click", (event) => {
+    const button = event.currentTarget;
+    const passwordInput = document.querySelector("#home-password");
+    if (!passwordInput) return;
+
+    const shouldShowPassword = passwordInput.type === "password";
+    passwordInput.type = shouldShowPassword ? "text" : "password";
+    button.setAttribute("aria-pressed", String(shouldShowPassword));
+    button.setAttribute("aria-label", shouldShowPassword ? "Ocultar senha" : "Mostrar senha");
+    passwordInput.focus();
+  });
+
   document.querySelector("#continue-with-google")?.addEventListener("click", async (event) => {
     const button = event.currentTarget;
     const originalLabel = button.textContent;

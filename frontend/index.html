@@ -37,6 +37,7 @@
 
       <nav class="top-nav" aria-label="Navegação principal">
         <a href="/login/">Login</a>
+        <a href="/catalogo/">Catálogo</a>
         <a href="/admin/" hidden>Admin</a>
       </nav>
     </header>
@@ -49,28 +50,57 @@
           alt=""
           aria-hidden="true"
         >
-        <div class="onboarding-card">
+        <div class="onboarding-card entry-login-card">
 
           <form class="inline-access-form" id="home-access-form">
             <label for="home-access">E-mail ou telefone</label>
             <input id="home-access" type="text" inputmode="email" autocomplete="email tel" placeholder="seu e-mail ou telefone">
             <label for="home-password">Senha</label>
-            <input id="home-password" type="password" autocomplete="current-password" placeholder="sua senha">
-            <button class="button primary" type="submit">Entrar no Shopping</button>
+            <div class="entry-password-field">
+              <input id="home-password" type="password" autocomplete="current-password" placeholder="sua senha">
+              <button class="entry-password-toggle" type="button" aria-label="Mostrar senha" aria-controls="home-password" aria-pressed="false">
+                <svg class="entry-eye-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M2.8 12s3.2-5.5 9.2-5.5S21.2 12 21.2 12 18 17.5 12 17.5 2.8 12 2.8 12Z"></path>
+                  <circle cx="12" cy="12" r="2.4"></circle>
+                </svg>
+              </button>
+            </div>
+            <button class="button primary entry-primary-submit" type="submit">
+              <span class="entry-button-label">Entrar no Shopping</span>
+            </button>
           </form>
 
           <div class="entry-actions" aria-label="Login">
-            <button class="button secondary" type="button" id="continue-with-google">
-              Continuar com Google
+            <button class="button secondary entry-secondary-action entry-google-action" type="button" id="continue-with-google">
+              <span class="entry-button-label">Continuar com Google</span>
             </button>
-            <a class="button secondary" href="/catalogo/" id="continue-without-login">
-              Continuar sem login
+            <a class="button secondary entry-secondary-action entry-guest-action" href="/catalogo/" id="continue-without-login">
+              <span class="entry-button-label">Continuar sem login</span>
             </a>
           </div>
 
-          <div class="future-auth-row">
+          <div class="future-auth-row entry-account-links">
+            <a href="/recuperar-senha/">Esqueceu sua senha?</a>
             <a href="/login/#create-account">Criar conta</a>
-            <a href="/cadastro-parceiro/">Quero vender no IAGO</a>
+          </div>
+
+          <div class="entry-card-divider" aria-hidden="true"></div>
+
+          <div class="entry-seller-box">
+            <span class="entry-seller-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false">
+                <path d="M4 10.2 5.2 5h13.6l1.2 5.2"></path>
+                <path d="M5 10.2v7.6A1.2 1.2 0 0 0 6.2 19h11.6a1.2 1.2 0 0 0 1.2-1.2v-7.6"></path>
+                <path d="M8 19v-5h8v5"></path>
+                <path d="M4 10.2h16"></path>
+              </svg>
+            </span>
+            <div class="entry-seller-content">
+              <span>Quer vender seus produtos?</span>
+              <a class="button ghost entry-seller-button" href="/cadastro-parceiro/">
+                <span class="entry-button-label">Seja vendedor IAGO</span>
+              </a>
+            </div>
           </div>
         </div>
       </section>
