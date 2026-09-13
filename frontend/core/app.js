@@ -4,7 +4,6 @@ import { initCartPage } from "../features/cart.js";
 import { initCheckoutPage } from "../features/checkout.js";
 import { initCatalogPage } from "../features/catalog.js";
 import { initEntryPage } from "../features/entry.js";
-import { initLoginPage } from "../features/login.js";
 import { initOrdersPage } from "../features/orders.js";
 import { initPasswordRecoveryPage, initPasswordUpdatePage } from "../features/passwordRecovery.js";
 import { initPartnerSignupPage } from "../features/partnerSignup.js";
@@ -32,7 +31,6 @@ function boot() {
   if (page === "cart") initCartPage();
   if (page === "checkout") initCheckoutPage();
   if (page === "orders") initOrdersPage();
-  if (page === "login") initLoginPage();
   if (page === "partner-signup") initPartnerSignupPage();
   if (page === "admin") initAdminPage();
   if (page === "profile") initProfilePage();

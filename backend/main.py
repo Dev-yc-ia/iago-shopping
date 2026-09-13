@@ -55,7 +55,7 @@ def create_app() -> FastAPI:
             "checkout": FRONTEND_DIR / "checkout" / "index.html",
             "pedidos": FRONTEND_DIR / "pedidos" / "index.html",
             "dados-pessoais": FRONTEND_DIR / "dados-pessoais" / "index.html",
-            "login": FRONTEND_DIR / "login" / "index.html",
+            "login": FRONTEND_DIR / "index.html",
             "cadastro-parceiro": FRONTEND_DIR / "cadastro-parceiro" / "index.html",
             "admin": FRONTEND_DIR / "admin" / "index.html",
             "recuperar-senha": FRONTEND_DIR / "recuperar-senha" / "index.html",

@@ -26,7 +26,7 @@
   <title>IAGO Shopping</title>
   <link rel="stylesheet" href="/css/style.css">
 </head>
-<body data-page="entry">
+<body data-page="entry" data-auth-mode="login">
   <div class="app-shell">
     <header class="app-header">
       <a class="brand-mark" href="/" aria-label="IAGO Shopping">
@@ -43,50 +43,51 @@
     </header>
 
     <main>
-      <section class="entry-hero onboarding-hero" aria-label="Login IAGO Shopping">
+      <section class="entry-hero onboarding-hero auth-main" aria-label="Login IAGO Shopping">
         <img
           class="hero-scene-image"
           src="/assets/images/hero/tela_login.png"
           alt=""
           aria-hidden="true"
         >
-        <div class="onboarding-card entry-login-card">
+        <div class="onboarding-card entry-login-card auth-panel">
+          <p class="auth-notice" data-login-notice hidden></p>
 
-          <form class="inline-access-form" id="home-access-form">
+          <form class="inline-access-form auth-form" id="home-access-form">
             <label for="home-access">E-mail ou telefone</label>
             <input id="home-access" type="text" inputmode="email" autocomplete="email tel" placeholder="seu e-mail ou telefone">
             <label for="home-password">Senha</label>
-            <div class="entry-password-field">
+            <div class="entry-password-field auth-password-field">
               <input id="home-password" type="password" autocomplete="current-password" placeholder="sua senha">
-              <button class="entry-password-toggle" type="button" aria-label="Mostrar senha" aria-controls="home-password" aria-pressed="false">
-                <svg class="entry-eye-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <button class="entry-password-toggle auth-password-toggle" type="button" aria-label="Mostrar senha" aria-controls="home-password" aria-pressed="false">
+                <svg class="entry-eye-icon auth-eye-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                   <path d="M2.8 12s3.2-5.5 9.2-5.5S21.2 12 21.2 12 18 17.5 12 17.5 2.8 12 2.8 12Z"></path>
                   <circle cx="12" cy="12" r="2.4"></circle>
                 </svg>
               </button>
             </div>
-            <button class="button primary entry-primary-submit" type="submit">
-              <span class="entry-button-label">Entrar no Shopping</span>
+            <button class="button primary entry-primary-submit auth-primary-submit" type="submit">
+              <span class="entry-button-label auth-button-label">Entrar no Shopping</span>
             </button>
           </form>
 
           <div class="entry-actions" aria-label="Login">
-            <button class="button secondary entry-secondary-action entry-google-action" type="button" id="continue-with-google">
-              <span class="entry-button-label">Continuar com Google</span>
+            <button class="button secondary entry-secondary-action entry-google-action auth-secondary-action auth-google-action" type="button" id="continue-with-google">
+              <span class="entry-button-label auth-button-label">Continuar com Google</span>
             </button>
-            <a class="button secondary entry-secondary-action entry-guest-action" href="/catalogo/" id="continue-without-login">
-              <span class="entry-button-label">Continuar sem login</span>
+            <a class="button secondary entry-secondary-action entry-guest-action auth-secondary-action auth-guest-action" href="/catalogo/" id="continue-without-login">
+              <span class="entry-button-label auth-button-label">Continuar sem login</span>
             </a>
           </div>
 
-          <div class="future-auth-row entry-account-links">
+          <div class="future-auth-row entry-account-links" data-login-actions>
             <a href="/recuperar-senha/">Esqueceu sua senha?</a>
             <a href="/login/#create-account">Criar conta</a>
           </div>
 
-          <div class="entry-card-divider" aria-hidden="true"></div>
+          <div class="entry-card-divider" data-login-actions aria-hidden="true"></div>
 
-          <div class="entry-seller-box">
+          <div class="entry-seller-box" data-login-actions>
             <span class="entry-seller-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" focusable="false">
                 <path d="M4 10.2 5.2 5h13.6l1.2 5.2"></path>
@@ -98,8 +99,16 @@
             <div class="entry-seller-content">
               <span>Quer vender seus produtos?</span>
               <a class="button ghost entry-seller-button" href="/cadastro-parceiro/">
-                <span class="entry-button-label">Seja vendedor IAGO</span>
+                <span class="entry-button-label auth-button-label">Seja vendedor IAGO</span>
               </a>
+            </div>
+          </div>
+
+          <div class="auth-signup-footer" data-signup-actions hidden>
+            <div class="auth-card-divider" aria-hidden="true"></div>
+            <div class="auth-existing-account-row">
+              <span>Já possui uma conta?</span>
+              <a href="/login/" data-login-toggle>Entrar</a>
             </div>
           </div>
         </div>
