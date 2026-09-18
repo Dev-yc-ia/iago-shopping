@@ -5,6 +5,11 @@ import {
   initAuthNavigation,
   invalidateAuthNavigationCache,
 } from "./auth.js";
+import {
+  CHECKOUT_REQUIRED_FIELD_LABELS,
+  CHECKOUT_REQUIRED_FIELDS,
+  validateCheckoutProfile,
+} from "../utils/checkoutProfile.js";
 
 const AVATAR_BUCKET = "shopping-avatars";
 const MAX_AVATAR_SIZE_BYTES = 5 * 1024 * 1024;
@@ -21,7 +26,7 @@ let currentAvatarPath = null;
 let pendingAvatarRemoval = false;
 
 function currentRelativeUrl() {
-  return "/dados-pessoais/";
+  return `/dados-pessoais/${window.location.search}`;
 }
 
 function redirectToLogin() {
@@ -147,6 +152,98 @@ function setFeedback(element, message, tone = "neutral") {
   element.hidden = false;
   element.textContent = message;
   element.dataset.tone = tone;
+}
+
+function isCheckoutProfileFlow() {
+  return new URLSearchParams(window.location.search).get("aviso") === "checkout";
+}
+
+function safeRedirectTarget() {
+  const redirect = new URLSearchParams(window.location.search).get("redirect");
+  return redirect === "/carrinho/" ? redirect : "";
+}
+
+function profileFromForm(form, session) {
+  return {
+    nome_completo: getFormValue(form, "nomeCompleto"),
+    email_normalizado: getFormValue(form, "email") || session?.user?.email || "",
+    telefone_normalizado: getFormValue(form, "telefone"),
+  };
+}
+
+function addressFromForm(form) {
+  return {
+    nome_destinatario: getFormValue(form, "nomeDestinatario"),
+    cep: getFormValue(form, "cep"),
+    logradouro: getFormValue(form, "logradouro"),
+    numero: getFormValue(form, "numero"),
+    bairro: getFormValue(form, "bairro"),
+    cidade: getFormValue(form, "cidade"),
+    uf: getFormValue(form, "uf").toUpperCase(),
+  };
+}
+
+function fieldElement(form, field) {
+  const names = {
+    nomeCompleto: "nomeCompleto",
+    email: "email",
+    telefone: "telefone",
+    nomeDestinatario: "nomeDestinatario",
+    cep: "cep",
+    logradouro: "logradouro",
+    numero: "numero",
+    bairro: "bairro",
+    cidade: "cidade",
+    uf: "uf",
+  };
+  return form.elements[names[field]] || null;
+}
+
+function updateMissingMessage(element, result) {
+  if (!element) return;
+  if (result.complete) {
+    element.hidden = true;
+    element.textContent = "";
+    return;
+  }
+
+  const labels = result.missingFields.map((field) => CHECKOUT_REQUIRED_FIELD_LABELS[field]);
+  element.hidden = false;
+  element.textContent = `Pendências: ${labels.join(", ")}.`;
+}
+
+function applyCheckoutValidation(form, result, options = {}) {
+  const missing = new Set(result.missingFields);
+  CHECKOUT_REQUIRED_FIELDS.forEach((field) => {
+    const element = fieldElement(form, field);
+    if (!element) return;
+    const invalid = missing.has(field);
+    element.toggleAttribute("aria-invalid", invalid);
+    element.classList.toggle("is-invalid", invalid);
+  });
+
+  if (options.focusFirstInvalid && result.missingFields.length) {
+    const firstInvalid = fieldElement(form, result.missingFields[0]);
+    firstInvalid?.focus({ preventScroll: true });
+    firstInvalid?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+}
+
+function validateCheckoutForm(form, session, options = {}) {
+  const result = validateCheckoutProfile(profileFromForm(form, session), addressFromForm(form), session);
+  applyCheckoutValidation(form, result, options);
+  updateMissingMessage(document.querySelector("[data-checkout-profile-missing]"), result);
+  return result;
+}
+
+function showCheckoutNotice(profile, address, form, session) {
+  const notice = document.querySelector("[data-checkout-profile-notice]");
+  if (!notice || !isCheckoutProfileFlow()) return;
+
+  notice.hidden = false;
+  const result = validateCheckoutProfile(profile, address, session);
+  applyCheckoutValidation(form, result, { focusFirstInvalid: !result.complete });
+  updateMissingMessage(document.querySelector("[data-checkout-profile-missing]"), result);
 }
 
 function fillAddressForm(form, address) {
@@ -275,9 +372,11 @@ async function saveProfilePage(form, feedback, supabase, session) {
       await initAuthNavigation();
     }
     setFeedback(feedback, "Dados pessoais salvos com sucesso.", "success");
+    return { profile, address };
   } catch (error) {
     if (uploadedAvatarPath) await removeAvatar(supabase, uploadedAvatarPath);
     setFeedback(feedback, error.message || "Não foi possível salvar seus dados.", "error");
+    return null;
   }
 }
 
@@ -301,6 +400,14 @@ export async function initProfilePage() {
     fillAddressForm(form, address);
     await renderCurrentAvatar(supabase, avatarPreview, profile, session);
     setFeedback(feedback, "Dados carregados.", "neutral");
+    showCheckoutNotice(profile, address, form, session);
+
+    CHECKOUT_REQUIRED_FIELDS.forEach((field) => {
+      const element = fieldElement(form, field);
+      element?.addEventListener("input", () => {
+        if (isCheckoutProfileFlow()) validateCheckoutForm(form, session);
+      });
+    });
 
     form.elements.avatar?.addEventListener("change", () => {
       try {
@@ -325,8 +432,33 @@ export async function initProfilePage() {
 
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
+      if (isCheckoutProfileFlow()) {
+        const result = validateCheckoutForm(form, session, { focusFirstInvalid: true });
+        if (!result.complete) {
+          setFeedback(feedback, "Complete os campos obrigatórios destacados para continuar.", "error");
+          return;
+        }
+      }
+
       setFeedback(feedback, "Salvando dados.", "neutral");
-      await saveProfilePage(form, feedback, supabase, session);
+      const saved = await saveProfilePage(form, feedback, supabase, session);
+      if (!saved || !isCheckoutProfileFlow()) return;
+
+      const [persistedProfile, persistedAddress] = await Promise.all([
+        loadOwnProfile(supabase),
+        loadDefaultAddress(supabase),
+      ]);
+      const result = validateCheckoutProfile(persistedProfile, persistedAddress, session);
+      applyCheckoutValidation(form, result, { focusFirstInvalid: !result.complete });
+      updateMissingMessage(document.querySelector("[data-checkout-profile-missing]"), result);
+      if (!result.complete) {
+        setFeedback(feedback, "Ainda há dados obrigatórios pendentes. Revise os campos destacados.", "error");
+        return;
+      }
+
+      const redirect = safeRedirectTarget();
+      setFeedback(feedback, "Dados salvos. Voltando ao carrinho.", "success");
+      if (redirect) window.location.href = redirect;
     });
   } catch (error) {
     setFeedback(feedback, error.message || "Não foi possível carregar seus dados.", "error");

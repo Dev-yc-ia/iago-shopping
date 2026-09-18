@@ -33,6 +33,12 @@
       </section>
 
       <form class="profile-form" data-profile-form>
+        <section class="profile-checkout-notice" data-checkout-profile-notice hidden>
+          <strong>Complete seus dados para continuar a compra.</strong>
+          <span>Precisamos das informações de contato e do endereço de entrega antes de finalizar o pedido.</span>
+          <span data-checkout-profile-missing hidden></span>
+        </section>
+
         <section class="profile-section profile-avatar-editor" aria-labelledby="profile-avatar-title">
           <div>
             <span class="card-kicker">Foto de perfil</span>
@@ -53,13 +59,13 @@
           </div>
           <div class="profile-form-grid">
             <label for="profile-full-name">Nome completo</label>
-            <input id="profile-full-name" name="nomeCompleto" type="text" autocomplete="name" placeholder="Seu nome completo">
+            <input id="profile-full-name" name="nomeCompleto" type="text" autocomplete="name" placeholder="Seu nome completo" required>
 
             <label for="profile-email">E-mail</label>
             <input id="profile-email" name="email" type="email" autocomplete="email" readonly>
 
             <label for="profile-phone">Telefone / WhatsApp</label>
-            <input id="profile-phone" name="telefone" type="tel" autocomplete="tel" placeholder="(00) 00000-0000">
+            <input id="profile-phone" name="telefone" type="tel" autocomplete="tel" placeholder="(00) 00000-0000" required>
           </div>
         </section>
 
@@ -70,28 +76,29 @@
           </div>
           <div class="profile-form-grid">
             <label for="address-recipient">Nome do destinatário</label>
-            <input id="address-recipient" name="nomeDestinatario" type="text" autocomplete="name">
+            <input id="address-recipient" name="nomeDestinatario" type="text" autocomplete="name" required>
 
             <label for="address-zip">CEP</label>
-            <input id="address-zip" name="cep" type="text" inputmode="numeric" autocomplete="postal-code">
+            <input id="address-zip" name="cep" type="text" inputmode="numeric" autocomplete="postal-code" required>
+            <p class="profile-field-status" data-address-zip-status hidden aria-live="polite"></p>
 
             <label for="address-street">Logradouro</label>
-            <input id="address-street" name="logradouro" type="text" autocomplete="address-line1">
+            <input id="address-street" name="logradouro" type="text" autocomplete="address-line1" required>
 
             <label for="address-number">Número</label>
-            <input id="address-number" name="numero" type="text" autocomplete="address-line2">
+            <input id="address-number" name="numero" type="text" autocomplete="address-line2" required>
 
             <label for="address-extra">Complemento</label>
             <input id="address-extra" name="complemento" type="text" autocomplete="address-line3">
 
             <label for="address-neighborhood">Bairro</label>
-            <input id="address-neighborhood" name="bairro" type="text">
+            <input id="address-neighborhood" name="bairro" type="text" required>
 
             <label for="address-city">Cidade</label>
-            <input id="address-city" name="cidade" type="text" autocomplete="address-level2">
+            <input id="address-city" name="cidade" type="text" autocomplete="address-level2" required>
 
             <label for="address-state">UF</label>
-            <input id="address-state" name="uf" type="text" maxlength="2" autocomplete="address-level1">
+            <input id="address-state" name="uf" type="text" maxlength="2" autocomplete="address-level1" required>
 
             <label for="address-reference">Referência</label>
             <textarea id="address-reference" name="referencia" rows="3"></textarea>

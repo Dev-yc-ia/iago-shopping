@@ -60,7 +60,7 @@ function createGalleryButton(label, direction, onClick) {
   path.setAttribute("stroke", "currentColor");
   path.setAttribute("stroke-linecap", "round");
   path.setAttribute("stroke-linejoin", "round");
-  path.setAttribute("stroke-width", "3");
+  path.setAttribute("stroke-width", "2");
   icon.append(path);
   button.append(icon);
 

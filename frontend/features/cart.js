@@ -2,6 +2,7 @@ import { getSupabaseClient } from "./auth.js";
 import { createProductImage } from "../ui/productImage.js";
 import { recordEvent } from "../utils/analytics.js";
 import { formatCurrency } from "../utils/format.js";
+import { validateCheckoutProfile } from "../utils/checkoutProfile.js";
 
 const CART_UPDATED_EVENT = "iago:cart:updated";
 
@@ -115,6 +116,30 @@ async function removeCartItem(itemId) {
 async function finalizeCartOrder() {
   const supabase = await getAuthenticatedCartClient();
   if (!supabase) return null;
+
+  const [
+    sessionResult,
+    profileResult,
+    addressResult,
+  ] = await Promise.all([
+    supabase.auth.getSession(),
+    supabase.rpc("shopping_perfil_atual"),
+    supabase.rpc("shopping_endereco_padrao_atual"),
+  ]);
+  if (sessionResult.error) throw sessionResult.error;
+  if (profileResult.error) throw profileResult.error;
+  if (addressResult.error) throw addressResult.error;
+
+  const profileStatus = validateCheckoutProfile(
+    profileResult.data?.[0] || null,
+    addressResult.data?.[0] || null,
+    sessionResult.data?.session || null,
+  );
+  if (!profileStatus.complete) {
+    recordEvent("checkout_profile_required", { missingFields: profileStatus.missingFields });
+    window.location.href = "/dados-pessoais/?aviso=checkout&redirect=/carrinho/";
+    return null;
+  }
 
   const { data, error } = await supabase.rpc("shopping_pedido_finalizar_carrinho");
   if (error) throw error;
