@@ -1,13 +1,7 @@
 export const CATALOG_CONTEXT_STORAGE_KEY = "iago-shopping-catalog-context";
-export const CATALOG_CONTEXT_VERSION = 2;
+export const CATALOG_CONTEXT_VERSION = 3;
 
-export const DEFAULT_CATALOG_FILTERS = {
-  search: "",
-  category: "todos",
-  availability: "todos",
-  brand: "todos",
-  sort: "relevancia",
-};
+export const DEFAULT_CATALOG_CATEGORY = "todos";
 
 function safeSessionStorage() {
   try {
@@ -22,28 +16,25 @@ function positivePage(value) {
   return Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
 }
 
-export function normalizeCatalogFilters(filters = {}) {
-  return {
-    search: String(filters.search || ""),
-    category: String(filters.category || DEFAULT_CATALOG_FILTERS.category),
-    availability: String(filters.availability || DEFAULT_CATALOG_FILTERS.availability),
-    brand: String(filters.brand || DEFAULT_CATALOG_FILTERS.brand),
-    sort: String(filters.sort || DEFAULT_CATALOG_FILTERS.sort),
-  };
+export function normalizeCatalogCategory(category) {
+  return String(category || DEFAULT_CATALOG_CATEGORY);
 }
 
 export function serializeCatalogContext({
-  filters = DEFAULT_CATALOG_FILTERS,
+  category = DEFAULT_CATALOG_CATEGORY,
   page = 1,
-  filterCollapsed = false,
   productIds = [],
 } = {}) {
+  const normalizedCategory = normalizeCatalogCategory(category);
+
   return {
     version: CATALOG_CONTEXT_VERSION,
     source: "catalogo",
-    filters: normalizeCatalogFilters(filters),
+    category: normalizedCategory,
+    filters: {
+      category: normalizedCategory,
+    },
     page: positivePage(page),
-    filterCollapsed: Boolean(filterCollapsed),
     productIds: productIds.map((id) => String(id || "")).filter(Boolean),
     savedAt: Date.now(),
   };
@@ -67,11 +58,15 @@ export function readCatalogContext() {
   try {
     const context = JSON.parse(storage.getItem(CATALOG_CONTEXT_STORAGE_KEY) || "null");
     if (context?.version !== CATALOG_CONTEXT_VERSION || context.source !== "catalogo") return null;
+    const category = normalizeCatalogCategory(context.category || context.filters?.category);
+
     return {
       ...context,
-      filters: normalizeCatalogFilters(context.filters),
+      category,
+      filters: {
+        category,
+      },
       page: positivePage(context.page),
-      filterCollapsed: Boolean(context.filterCollapsed),
       productIds: Array.isArray(context.productIds)
         ? context.productIds.map((id) => String(id || "")).filter(Boolean)
         : [],

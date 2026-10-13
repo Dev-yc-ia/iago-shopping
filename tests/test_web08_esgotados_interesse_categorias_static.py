@@ -17,10 +17,6 @@ def test_web08_catalog_sorts_sold_out_after_available_before_pagination():
     for fragment in [
         "function availabilityWeight(product)",
         'return product.availability === "esgotado" ? 1 : 0;',
-        "function compareProductsBySortMode(left, right, sortMode)",
-        'sortMode === "menor-preco"',
-        'sortMode === "maior-preco"',
-        'sortMode === "nome"',
         "availabilityWeight(left.product) - availabilityWeight(right.product)",
         "|| left.index - right.index",
         "const pagination = paginateProducts(filtered, currentPage);",
@@ -28,6 +24,14 @@ def test_web08_catalog_sorts_sold_out_after_available_before_pagination():
         'product.availability === "esgotado" ? "Estou interessado" : "Ver produto"',
     ]:
         assert fragment in catalog + card
+
+    for removed_fragment in [
+        "function compareProductsBySortMode(left, right, sortMode)",
+        'sortMode === "menor-preco"',
+        'sortMode === "maior-preco"',
+        'sortMode === "nome"',
+    ]:
+        assert removed_fragment not in catalog
 
 
 def test_web08_catalog_uses_dynamic_categories_from_loaded_products():
@@ -38,11 +42,18 @@ def test_web08_catalog_uses_dynamic_categories_from_loaded_products():
         "new Set(products.map((product) => product.category).filter(Boolean))",
         'category.id === "todos" || categoryIds.has(category.id)',
         "const visibleCategories = visibleCategoriesFromProducts(products);",
-        "buildOptions(category, visibleCategories);",
         "buildTabs(tabs, visibleCategories, (categoryId) => {",
-        "setExistingSelectValue(category, filters.category);",
+        "selectedCategory = hasCategory(visibleCategories, categoryId) ? categoryId : DEFAULT_CATEGORY;",
+        "hasCategory(visibleCategories, savedContext.category)",
     ]:
         assert fragment in catalog
+
+    for removed_fragment in [
+        "buildOptions(category, visibleCategories);",
+        "setExistingSelectValue(category, filters.category);",
+        "document.querySelector(\"#category-filter\")",
+    ]:
+        assert removed_fragment not in catalog
 
 
 def test_web08_product_interest_flow_uses_login_redirect_and_rpc():
