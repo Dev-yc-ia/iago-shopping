@@ -60,7 +60,18 @@
               <option value="">Selecione</option><option>Feminino</option><option>Masculino</option>
             </select></label>
             <label>Categoria-base <select name="categoria" required></select></label>
-            <button>Cadastrar</button>
+            <label>
+              Foto do skatista
+              <input type="file" name="foto" accept="image/jpeg,image/png,image/webp" />
+            </label>
+            <img id="previa-foto" alt="Prévia da foto do skatista" width="64" height="64" hidden />
+            <label>
+              <input type="checkbox" name="foto_autorizada" />
+              Tenho autorização para exibir esta foto no ranking público.
+            </label>
+            <button type="button" id="remover-foto" hidden>Remover foto</button>
+            <button type="submit">Cadastrar</button>
+            <button type="button" id="cancelar-edicao" hidden>Cancelar edição</button>
           </form>
         </details>
         <details class="painel">

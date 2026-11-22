@@ -52,6 +52,27 @@
           </p>
           <button hidden="" id="tentar">Tentar novamente</button>
         </div>
+
+        <section class="painel controle" hidden="" id="juiz">
+          <p class="eyebrow">Banca · Escala 0–100</p>
+          <h2>Envie sua nota.</h2>
+          <p class="suave" id="orientacao">Aguarde a liberação do master.</p>
+          <form id="votacao">
+            <label
+              >Nota<input
+                autocomplete="off"
+                id="nota"
+                inputmode="decimal"
+                maxlength="6"
+                placeholder="0,00"
+                required="" /></label
+            ><button class="primario" id="enviar">
+              Conferir e enviar nota
+            </button>
+          </form>
+          <p class="suave" id="recibo" role="status"></p>
+        </section>
+
         <section aria-label="Ranking por categoria" class="placar">
           <div class="placar-topo">
             <div>
