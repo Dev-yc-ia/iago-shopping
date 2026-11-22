@@ -42,8 +42,8 @@ export async function bytes(request: Request, limit: number, message: string) {
   }
   return result;
 }
-export async function body(request: Request): Promise<Body> {
-  const raw = await bytes(request, 65536, "Corpo da requisição excede o limite.");
+export async function body(request: Request, limit = 65536): Promise<Body> {
+  const raw = await bytes(request, limit, "Corpo da requisição excede o limite.");
   let data: unknown;
   try { data = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(raw)); }
   catch { fail(422, "Dados inválidos."); }

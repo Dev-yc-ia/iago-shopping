@@ -1,8 +1,9 @@
 import { parse } from "npm:csv-parse@5.6.0/sync";
 import { readXlsx } from "./xlsx.ts";
 import { session } from "./auth.ts";
-import { body, bytes, type Context, date, digest, fail, string } from "./common.ts";
+import { body, bytes, type Body, type Context, date, digest, errorCode, fail, lockEvent, string } from "./common.ts";
 import { casefold } from "./casefold.ts";
+import { athleteBodyLimit, photo, savePhoto } from "./avatar.ts";
 
 const header = ["atleta", "escola", "data_nascimento", "ano_nascimento", "sexo_confirmado", "categoria_base_idade"];
 const maxBytes = 2 * 1024 * 1024;
@@ -57,7 +58,7 @@ export async function parseFile(name: string, data: Uint8Array, codigo: string, 
   if (!entries.length) fail(422, "A planilha está vazia.");
   return entries;
 }
-async function save({ sql, request, codigo }: Context, entries: Entry[]) {
+async function save({ sql, request, codigo }: Context, entries: Entry[], png?: ReturnType<typeof photo>) {
   return await sql.begin("read write", async (c) => {
     await session(c, request, { role: "master", lock: true });
     await c`SELECT pg_advisory_xact_lock(hashtext(${codigo}))`;
@@ -86,6 +87,7 @@ async function save({ sql, request, codigo }: Context, entries: Entry[]) {
         newEntries.push({ ...entry, category });
       }
     }
+    if (png && duplicados) fail(409, "Cadastro existente. Use Editar para publicar uma foto.");
     const [{ numero }] = await c`SELECT coalesce(max(numero_provisorio),0) AS numero
       FROM cadastro.inscricoes WHERE evento_id=${event.id}`;
     // Batch insertion with explicit IDs avoids depending on a database driver's RETURNING order.
@@ -97,19 +99,66 @@ async function save({ sql, request, codigo }: Context, entries: Entry[]) {
       await c`INSERT INTO cadastro.inscricoes ${c(records.map((r) => ({
         evento_id: event.id, skatista_id: r.id, chave_origem: r.key, categoria_base_id: r.category, numero_provisorio: r.numero,
       })), "evento_id", "skatista_id", "chave_origem", "categoria_base_id", "numero_provisorio")}`;
+      if (png) await savePhoto(c, records[0].id, png);
     }
     return { incluidos: newEntries.length, duplicados };
   });
 }
 const today = () => new Date().toISOString().slice(0, 10);
-export async function createAthlete(ctx: Context) {
-  const data = await body(ctx.request);
+async function manual(data: Body, codigo: string) {
   const birth = date(data.nascimento);
-  const entry = await validateRow([
+  return await validateRow([
     string(data, "nome", 200), string(data, "escola", 200), birth, birth.slice(0, 4),
     string(data, "sexo", 20), string(data, "categoria", 200),
-  ], ctx.codigo, 1, today());
-  return await save(ctx, [entry]);
+  ], codigo, 1, today());
+}
+export async function createAthlete(ctx: Context) {
+  await session(ctx.sql, ctx.request, { role: "master" });
+  const data = await body(ctx.request, athleteBodyLimit);
+  return await save(ctx, [await manual(data, ctx.codigo)], photo(data));
+}
+
+export async function updateAthlete(ctx: Context, id: string) {
+  const { sql, request, codigo } = ctx;
+  await session(sql, request, { role: "master" });
+  const data = await body(request, athleteBodyLimit);
+  const entry = await manual(data, codigo);
+  const png = photo(data, true);
+  try {
+    return await sql.begin("read write", async (c) => {
+      const event = await lockEvent(c, codigo);
+      await session(c, request, { role: "master", lock: true });
+      await c`SELECT pg_advisory_xact_lock(hashtext(${codigo}))`;
+      const [current] = await c`SELECT i.skatista_id,s.nome,s.escola,
+        s.data_nascimento::text AS nascimento,s.sexo_confirmado, i.categoria_base_id
+        FROM cadastro.inscricoes i JOIN cadastro.skatistas s ON s.id=i.skatista_id
+        WHERE i.id=${id} AND i.evento_id=${event} FOR UPDATE OF s`;
+      if (!current) fail(404, "Inscrição não encontrada.");
+      const [category] = await c`SELECT id FROM cadastro.categorias WHERE evento_id=${event} AND codigo=${entry.categoria}`;
+      if (!category) fail(422, "Categoria-base indisponível no evento.");
+      const [active] = await c`SELECT 1 FROM operacao.tentativas
+        WHERE inscricao_id=${id} AND estado IN ('chamada','aberta')`;
+      if (active) fail(409, "Conclua ou cancele a volta em pista antes de editar.");
+      const identityChanged = current.nome !== entry.nome || current.nascimento !== entry.nascimento;
+      const fieldsChanged = identityChanged || current.escola !== entry.escola || current.sexo_confirmado !== entry.sexo;
+      if (fieldsChanged || png !== undefined) {
+        const [other] = await c`SELECT 1 FROM cadastro.inscricoes
+          WHERE skatista_id=${current.skatista_id} AND id<>${id} LIMIT 1`;
+        if (other) fail(409, "Skatista com outras inscrições. Apenas a categoria-base pode ser editada nesta ficha.");
+      }
+      if (fieldsChanged) await c`UPDATE cadastro.skatistas SET nome=${entry.nome},escola=${entry.escola},
+        data_nascimento=${entry.nascimento},sexo_confirmado=${entry.sexo} WHERE id=${current.skatista_id}`;
+      if (identityChanged) await c`UPDATE cadastro.inscricoes SET chave_origem=${entry.key} WHERE id=${id}`;
+      if (category.id !== current.categoria_base_id) {
+        await c`UPDATE cadastro.inscricoes SET categoria_base_id=${category.id} WHERE id=${id}`;
+      }
+      await savePhoto(c, current.skatista_id, png);
+      return { atualizado: true };
+    });
+  } catch (error) {
+    if (errorCode(error) === "23505") fail(409, "Já existe cadastro com esse nome e nascimento.");
+    throw error;
+  }
 }
 export async function importAthletes(ctx: Context) {
   await session(ctx.sql, ctx.request, { role: "master" });
@@ -122,9 +171,10 @@ export async function athletes({ sql, request, codigo }: Context) {
   return await sql.begin("isolation level repeatable read read only", async (c) => {
     await session(c, request, { role: "master" });
     const inscricoes = await c`SELECT i.id,i.numero_provisorio,s.nome,s.escola,s.data_nascimento::text,
-      s.ano_nascimento,s.sexo_confirmado,base.codigo AS categoria_base
+      s.ano_nascimento,s.sexo_confirmado,base.codigo AS categoria_base,f.versao AS avatar_versao
       FROM cadastro.inscricoes i JOIN cadastro.eventos e ON e.id=i.evento_id
       JOIN cadastro.skatistas s ON s.id=i.skatista_id
+      LEFT JOIN cadastro.fotos_skatistas f ON f.skatista_id=s.id
       JOIN cadastro.categorias base ON base.id=i.categoria_base_id
       WHERE e.codigo=${codigo} ORDER BY i.numero_provisorio`;
     const rows = await c`SELECT c.codigo FROM cadastro.categorias c

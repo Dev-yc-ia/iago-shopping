@@ -3,6 +3,7 @@ import { ranking } from "./ranking.ts";
 import * as auth from "./auth.ts";
 import * as competition from "./competition.ts";
 import * as athletes from "./athletes.ts";
+import { avatar } from "./avatar.ts";
 import { type Context, errorCode, HttpError, uuid } from "./common.ts";
 
 const dsn = Deno.env.get("IAGO_RUNTIME_DATABASE_URL");
@@ -42,6 +43,8 @@ const routes: Route[] = [
   { method: "GET", path: "/skatistas", handler: athletes.athletes },
   { method: "POST", path: "/skatistas", handler: athletes.createAthlete },
   { method: "POST", path: "/skatistas/importar", handler: athletes.importAthletes },
+  { method: "PATCH", path: /^\/skatistas\/(?!importar$)([^/]+)$/, handler: athletes.updateAthlete },
+  { method: "GET", path: /^\/skatistas\/([^/]+)\/avatar$/, handler: avatar },
   { method: "GET", path: "/notas", handler: athletes.notes },
 ];
 
@@ -73,7 +76,13 @@ export async function handle(request: Request, connect: () => Context["sql"] = d
     const sql = connect();
     stage = "consulta";
     const id = route.path instanceof RegExp ? uuid(route.path.exec(path)?.[1]) : "";
-    return json(await route.handler({ sql, codigo, request, url }, id), route.status);
+    const result = await route.handler({ sql, codigo, request, url }, id);
+    if (result instanceof Response) {
+      result.headers.set("Vary", "Origin");
+      if (origin) result.headers.set("Access-Control-Allow-Origin", origin);
+      return result;
+    }
+    return json(result, route.status);
   } catch (error) {
     if (error instanceof HttpError) return json({ detail: error.message }, error.status);
     const code = errorCode(error);

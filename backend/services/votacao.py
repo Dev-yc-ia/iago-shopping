@@ -340,18 +340,18 @@ def ranking_publico(settings):
         dia = c.execute(
             "SELECT (clock_timestamp() AT TIME ZONE 'America/Sao_Paulo')::date AS dia"
         ).fetchone()["dia"]
-        dia = dia if dia is not None else (dias[0] if dias else None)
         if filtro["grupo"] not in {grupo["chave"] for grupo in grupos}:
             filtro["grupo"] = grupos[0]["chave"] if grupos else None
         rows = c.execute(
-            """SELECT i.id,i.numero_provisorio,s.nome,cat.codigo AS categoria,
+            """SELECT i.id,i.numero_provisorio,s.nome,cat.codigo AS categoria,f.versao AS avatar_versao,
             cat.id::text || ':' || s.sexo_confirmado AS grupo,
             max(t.media) FILTER (WHERE t.volta=1) AS v1,
             max(t.media) FILTER (WHERE t.volta=2) AS v2
             FROM cadastro.inscricoes i JOIN cadastro.skatistas s ON s.id=i.skatista_id
             JOIN cadastro.categorias cat ON cat.id=i.categoria_base_id
+            LEFT JOIN cadastro.fotos_skatistas f ON f.skatista_id=s.id
             LEFT JOIN operacao.tentativas t ON t.evento_id=i.evento_id AND t.inscricao_id=i.id AND t.estado='concluida' AND t.dia_volta=%s
-            WHERE i.evento_id=%s GROUP BY i.id,i.numero_provisorio,s.nome,cat.codigo,cat.id,s.sexo_confirmado""",
+            WHERE i.evento_id=%s GROUP BY i.id,i.numero_provisorio,s.nome,cat.codigo,cat.id,s.sexo_confirmado,f.versao""",
             (dia, evento["id"]),
         ).fetchall()
         concluidas_hoje = c.execute(
@@ -382,6 +382,7 @@ def ranking_publico(settings):
                     "id": str(r["id"]),
                     "nome": r["nome"],
                     "numero_provisorio": r["numero_provisorio"],
+                    "avatar_versao": r["avatar_versao"],
                     "categoria": r["categoria"],
                     "grupo": r["grupo"],
                     "v1": format(r["v1"], ".2f") if r["v1"] is not None else None,

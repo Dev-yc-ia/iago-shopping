@@ -6,12 +6,13 @@ export async function ranking(sql: ReturnType<typeof postgres>, codigo: string) 
       SELECT id, (statement_timestamp() AT TIME ZONE 'America/Sao_Paulo')::date AS dia
       FROM cadastro.eventos WHERE codigo = ${codigo}
     ), atletas AS (
-      SELECT i.id, i.evento_id, i.numero_provisorio, s.nome, cat.codigo AS categoria,
+      SELECT i.id, i.evento_id, i.numero_provisorio, s.nome, f.versao AS avatar_versao, cat.codigo AS categoria,
              cat.id::text AS categoria_id, cat.ordem, s.sexo_confirmado AS sexo,
              cat.id::text || ':' || s.sexo_confirmado AS grupo,
              CASE WHEN s.sexo_confirmado = 'Masculino' THEN 0 ELSE 1 END AS ordem_sexo
       FROM evento e JOIN cadastro.inscricoes i ON i.evento_id = e.id
       JOIN cadastro.skatistas s ON s.id = i.skatista_id
+      LEFT JOIN cadastro.fotos_skatistas f ON f.skatista_id=s.id
       JOIN cadastro.categorias cat ON cat.id = i.categoria_base_id AND cat.evento_id = e.id
     ), grupos AS (
       SELECT DISTINCT grupo AS chave, categoria_id, categoria, sexo, ordem,
@@ -52,7 +53,7 @@ export async function ranking(sql: ReturnType<typeof postgres>, codigo: string) 
       'inscricoes', coalesce((
         SELECT jsonb_agg(jsonb_build_object(
           'id', id::text, 'nome', nome, 'numero_provisorio', numero_provisorio,
-          'categoria', categoria, 'grupo', grupo, 'v1', v1::text, 'v2', v2::text,
+          'avatar_versao', avatar_versao, 'categoria', categoria, 'grupo', grupo, 'v1', v1::text, 'v2', v2::text,
           'nf', CASE WHEN v1 IS NOT NULL AND v2 IS NOT NULL THEN melhor::text END,
           'posicao', CASE WHEN melhor IS NOT NULL THEN posicao END
         ) ORDER BY ordem, ordem_sexo, melhor DESC NULLS LAST, numero_provisorio)

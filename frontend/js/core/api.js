@@ -6,10 +6,21 @@ export function definirCsrf(valor) {
   csrf = valor || "";
 }
 
+function destinoApi(caminho) {
+  const local = new URL(caminho, BASE);
+  const relative = local.pathname.slice(BASE.pathname.length);
+  return API_EDGE ? new URL(relative.replace(/^api\//, "") + local.search, API_EDGE) : local;
+}
+
+export function urlAvatar(atleta) {
+  if (!atleta.avatar_versao) return null;
+  return destinoApi(`api/skatistas/${encodeURIComponent(atleta.id)}/avatar?v=${encodeURIComponent(atleta.avatar_versao)}`).href;
+}
+
 export async function consultar(caminho, { method = "GET", dados, arquivo } = {}) {
   const local = new URL(caminho, BASE);
   const relative = local.pathname.slice(BASE.pathname.length);
-  const destino = API_EDGE ? new URL(relative.replace(/^api\//, "") + local.search, API_EDGE) : local;
+  const destino = destinoApi(local);
   const rota = relative.split("?")[0];
   const token = API_EDGE ? sessionStorage.getItem(sessionKey) : null;
   let resposta;

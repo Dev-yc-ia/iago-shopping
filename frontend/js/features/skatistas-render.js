@@ -3,7 +3,7 @@ import { elemento } from "../core/dom.js";
 const formatarData = (iso) => iso.split("-").reverse().join("/");
 
 /** Somente nós textuais: nomes, escolas e demais valores nunca viram HTML. */
-export function renderizarSkatistas(inscricoes, destino) {
+export function renderizarSkatistas(inscricoes, destino, editar) {
   destino.replaceChildren(
     ...inscricoes.map((item) => {
       const card = elemento("article", "", "painel ficha");
@@ -18,7 +18,11 @@ export function renderizarSkatistas(inscricoes, destino) {
       const detalhes = elemento("dl");
       for (const [rotulo, valor] of campos)
         detalhes.append(elemento("dt", rotulo), elemento("dd", valor));
-      card.append(detalhes);
+      const botao = elemento("button", "Editar");
+      botao.type = "button";
+      botao.setAttribute("aria-label", `Editar ${item.nome}`);
+      botao.addEventListener("click", () => editar(item, botao));
+      card.append(detalhes, botao);
       return card;
     }),
   );

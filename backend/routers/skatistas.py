@@ -1,17 +1,19 @@
 """Ranking público e rotas privadas do cadastro e das notas."""
 
+import json
 from datetime import date
 from typing import Annotated
+from uuid import UUID
 
 import psycopg
-from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from pydantic import BaseModel, Field, ValidationError
 from starlette.concurrency import run_in_threadpool
 
 from backend.config.settings import Settings, get_settings
 from backend.db import read_connection
 from backend.security import sessao
-from backend.services import cadastro_skatistas, skatistas
+from backend.services import avatar, cadastro_skatistas, skatistas
 
 
 class CadastroSkatista(BaseModel):
@@ -35,6 +37,7 @@ def consultar(consulta, settings: Settings):
             detail="Banco local indisponível. Confira a conexão e tente novamente.",
         ) from None
 
+
 @router.get("/ranking")
 def obter_ranking(
     settings: Annotated[Settings, Depends(get_settings)],
@@ -57,12 +60,27 @@ def obter_skatistas(
     return consultar(obter, settings)
 
 
-@router.post("/skatistas")
-def cadastrar_skatista(
-    dados: CadastroSkatista,
-    request: Request,
-    settings: Annotated[Settings, Depends(get_settings)],
-):
+async def ler_cadastro(request, settings, *, edicao=False):
+    def autorizar(config):
+        with read_connection(config) as connection:
+            sessao(connection, request, perfil="master")
+
+    await run_in_threadpool(consultar, autorizar, settings)
+    conteudo = bytearray()
+    async for parte in request.stream():
+        if len(conteudo) + len(parte) > avatar.LIMITE_JSON:
+            raise HTTPException(413, "Corpo da requisição excede o limite.")
+        conteudo.extend(parte)
+    try:
+        bruto = json.loads(conteudo)
+        dados = CadastroSkatista.model_validate(bruto)
+        if (
+            not isinstance(bruto.get("nascimento"), str)
+            or bruto["nascimento"] != dados.nascimento.isoformat()
+        ):
+            raise ValueError
+    except (ValueError, RecursionError, ValidationError):
+        raise HTTPException(422, "Dados inválidos.") from None
     try:
         registro = cadastro_skatistas.validar_linha(
             (
@@ -78,10 +96,71 @@ def cadastrar_skatista(
         )
     except ValueError as erro:
         raise HTTPException(422, str(erro)) from None
-    return consultar(
-        lambda config: cadastro_skatistas.gravar_lote(config, request, [(1, registro)]),
+    return registro, avatar.foto(bruto, edicao=edicao)
+
+
+@router.post("/skatistas")
+async def cadastrar_skatista(
+    request: Request,
+    settings: Annotated[Settings, Depends(get_settings)],
+):
+    registro, png = await ler_cadastro(request, settings)
+    return await run_in_threadpool(
+        consultar,
+        lambda config: cadastro_skatistas.gravar_lote(
+            config, request, [(1, registro)], png
+        ),
         settings,
     )
+
+
+@router.patch("/skatistas/{inscricao_id}")
+async def editar_skatista(
+    inscricao_id: UUID,
+    request: Request,
+    settings: Annotated[Settings, Depends(get_settings)],
+):
+    registro, png = await ler_cadastro(request, settings, edicao=True)
+    return await run_in_threadpool(
+        consultar,
+        lambda config: cadastro_skatistas.editar(
+            config, request, inscricao_id, registro, png
+        ),
+        settings,
+    )
+
+
+@router.get("/skatistas/{inscricao_id}/avatar")
+def obter_avatar(
+    inscricao_id: UUID,
+    v: UUID,
+    request: Request,
+    settings: Annotated[Settings, Depends(get_settings)],
+):
+    def obter(config):
+        with read_connection(config) as connection:
+            return connection.execute(
+                """SELECT f.png FROM cadastro.fotos_skatistas f
+                JOIN cadastro.inscricoes i ON i.skatista_id=f.skatista_id
+                JOIN cadastro.eventos e ON e.id=i.evento_id
+                WHERE i.id=%s AND f.versao=%s AND e.codigo=%s""",
+                (inscricao_id, v, config.evento_codigo),
+            ).fetchone()
+
+    imagem = consultar(obter, settings)
+    if not imagem:
+        raise HTTPException(
+            404, "Foto indisponível.", headers={"Cache-Control": "no-store"}
+        )
+    etag = f'"{v}"'
+    headers = {
+        "Cache-Control": "public, no-cache",
+        "ETag": etag,
+        "X-Content-Type-Options": "nosniff",
+    }
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers=headers)
+    return Response(bytes(imagem["png"]), media_type="image/png", headers=headers)
 
 
 @router.post("/skatistas/importar")

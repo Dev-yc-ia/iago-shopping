@@ -3,6 +3,7 @@
 from backend.config.settings import Settings
 from backend.db import read_connection
 
+
 def ranking(settings: Settings) -> dict:
     """Catálogo compatível, acrescido somente de pista e resultados publicados."""
     from backend.services.votacao import ranking_publico
@@ -17,10 +18,11 @@ def credenciamento(settings: Settings) -> dict:
             """
             SELECT i.id, i.numero_provisorio, s.nome, s.escola,
                    s.data_nascimento, s.ano_nascimento, s.sexo_confirmado,
-                   base.codigo AS categoria_base
+                   base.codigo AS categoria_base, f.versao AS avatar_versao
             FROM cadastro.inscricoes AS i
             JOIN cadastro.eventos AS e ON e.id = i.evento_id
             JOIN cadastro.skatistas AS s ON s.id = i.skatista_id
+            LEFT JOIN cadastro.fotos_skatistas AS f ON f.skatista_id=s.id
             JOIN cadastro.categorias AS base ON base.id = i.categoria_base_id
             WHERE e.codigo = %s
             ORDER BY i.numero_provisorio
@@ -44,6 +46,7 @@ def credenciamento(settings: Settings) -> dict:
                 "ano_nascimento": row["ano_nascimento"],
                 "sexo_confirmado": row["sexo_confirmado"],
                 "categoria_base": row["categoria_base"],
+                "avatar_versao": row["avatar_versao"],
             }
             for row in rows
         ],

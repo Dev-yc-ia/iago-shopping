@@ -18,6 +18,24 @@ def conceder_operacao(connection):
     connection.execute(
         "GRANT INSERT ON cadastro.skatistas, cadastro.inscricoes TO iago_runtime"
     )
+    if connection.execute("SELECT to_regclass('cadastro.fotos_skatistas')").fetchone()[
+        0
+    ]:
+        connection.execute(
+            "GRANT SELECT, INSERT, UPDATE, DELETE ON cadastro.fotos_skatistas TO iago_runtime"
+        )
+        connection.execute(
+            "GRANT UPDATE (nome, escola, data_nascimento, sexo_confirmado) ON cadastro.skatistas TO iago_runtime"
+        )
+        connection.execute(
+            "GRANT UPDATE (categoria_base_id, chave_origem) ON cadastro.inscricoes TO iago_runtime"
+        )
+        if connection.execute(
+            "SELECT 1 FROM pg_roles WHERE rolname = %s", ("iago_importador",)
+        ).fetchone():
+            connection.execute(
+                "REVOKE ALL ON cadastro.fotos_skatistas FROM iago_importador"
+            )
     connection.execute("GRANT USAGE ON SCHEMA operacao TO iago_runtime")
     connection.execute("REVOKE ALL ON ALL TABLES IN SCHEMA operacao FROM iago_runtime")
     if connection.execute("SELECT to_regclass('operacao.notas_por_dia')").fetchone()[0]:

@@ -9,9 +9,12 @@ from zipfile import BadZipFile, ZipFile
 from fastapi import HTTPException
 from openpyxl import load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
+from psycopg.errors import UniqueViolation
 
 from backend.db import write_connection
 from backend.security import sessao
+from backend.services.avatar import MANTER, gravar_foto
+from backend.services.votacao import bloquear_evento
 from scripts.importar_skatistas import CABECALHO, Registro, chave_origem
 
 LIMITE_BYTES = 2 * 1024 * 1024
@@ -130,7 +133,7 @@ def ler_planilha(nome, conteudo, evento):
     raise ValueError("Use um arquivo .xlsx ou .csv.")
 
 
-def gravar_lote(settings, request, registros):
+def gravar_lote(settings, request, registros, png=MANTER):
     with write_connection(settings) as c:
         sessao(c, request, perfil="master", bloquear=True)
         # Compartilha a trava de alocação com o importador inicial.
@@ -181,6 +184,10 @@ def gravar_lote(settings, request, registros):
                 continue
             existentes[registro.chave] = atributos
             novos.append(registro)
+        if png is not MANTER and duplicados:
+            raise HTTPException(
+                409, "Cadastro existente. Use Editar para publicar uma foto."
+            )
         maior_numero = c.execute(
             "SELECT coalesce(max(numero_provisorio),0) AS numero FROM cadastro.inscricoes WHERE evento_id=%s",
             (evento_id,),
@@ -202,4 +209,81 @@ def gravar_lote(settings, request, registros):
                     numero,
                 ),
             )
+            gravar_foto(c, skatista["id"], png)
     return {"incluidos": len(novos), "duplicados": duplicados}
+
+
+def editar(settings, request, inscricao_id, registro, png=MANTER):
+    try:
+        with write_connection(settings) as c:
+            evento = bloquear_evento(c, settings)
+            sessao(c, request, perfil="master", bloquear=True)
+            c.execute(
+                "SELECT pg_advisory_xact_lock(hashtext(%s))", (settings.evento_codigo,)
+            )
+            atual = c.execute(
+                """SELECT i.skatista_id,s.nome,s.escola,s.data_nascimento,s.sexo_confirmado,
+                          i.categoria_base_id
+                FROM cadastro.inscricoes i JOIN cadastro.skatistas s ON s.id=i.skatista_id
+                WHERE i.id=%s AND i.evento_id=%s FOR UPDATE OF s""",
+                (inscricao_id, evento),
+            ).fetchone()
+            if not atual:
+                raise HTTPException(404, "Inscrição não encontrada.")
+            categoria = c.execute(
+                "SELECT id FROM cadastro.categorias WHERE evento_id=%s AND codigo=%s",
+                (evento, registro.categoria),
+            ).fetchone()
+            if not categoria:
+                raise HTTPException(422, "Categoria-base indisponível no evento.")
+            if c.execute(
+                "SELECT 1 FROM operacao.tentativas WHERE inscricao_id=%s AND estado IN ('chamada','aberta')",
+                (inscricao_id,),
+            ).fetchone():
+                raise HTTPException(
+                    409, "Conclua ou cancele a volta em pista antes de editar."
+                )
+            identidade = (
+                atual["nome"] != registro.nome
+                or atual["data_nascimento"] != registro.nascimento
+            )
+            dados = (
+                identidade
+                or atual["escola"] != registro.escola
+                or atual["sexo_confirmado"] != registro.sexo
+            )
+            if (dados or png is not MANTER) and c.execute(
+                "SELECT 1 FROM cadastro.inscricoes WHERE skatista_id=%s AND id<>%s LIMIT 1",
+                (atual["skatista_id"], inscricao_id),
+            ).fetchone():
+                raise HTTPException(
+                    409,
+                    "Skatista com outras inscrições. Apenas a categoria-base pode ser editada nesta ficha.",
+                )
+            if dados:
+                c.execute(
+                    "UPDATE cadastro.skatistas SET nome=%s,escola=%s,data_nascimento=%s,sexo_confirmado=%s WHERE id=%s",
+                    (
+                        registro.nome,
+                        registro.escola,
+                        registro.nascimento,
+                        registro.sexo,
+                        atual["skatista_id"],
+                    ),
+                )
+            if identidade:
+                c.execute(
+                    "UPDATE cadastro.inscricoes SET chave_origem=%s WHERE id=%s",
+                    (registro.chave, inscricao_id),
+                )
+            if categoria["id"] != atual["categoria_base_id"]:
+                c.execute(
+                    "UPDATE cadastro.inscricoes SET categoria_base_id=%s WHERE id=%s",
+                    (categoria["id"], inscricao_id),
+                )
+            gravar_foto(c, atual["skatista_id"], png)
+    except UniqueViolation:
+        raise HTTPException(
+            409, "Já existe cadastro com esse nome e nascimento."
+        ) from None
+    return {"atualizado": True}

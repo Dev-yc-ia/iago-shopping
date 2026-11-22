@@ -1,4 +1,5 @@
 import { elemento, opcoes } from "../core/dom.js";
+import { urlAvatar } from "../core/api.js";
 const IDS = [
   "filtros-ranking",
   "ranking",
@@ -37,19 +38,53 @@ export function criarVisualizacao() {
     dom.carga.textContent = mensagem;
     dom.tentar.hidden = situacao !== "erro";
   }
+  const avatares = new Map();
+  function avatar(atleta) {
+    const src = urlAvatar(atleta);
+    const inicial = Array.from(atleta.nome.trim())[0]?.toLocaleUpperCase("pt-BR") ?? "?";
+    const anterior = avatares.get(atleta.id);
+    if (anterior?.src === src && anterior.inicial === inicial) return anterior.no;
+
+    const no = elemento("span", "", "avatar-ranking");
+    const letra = elemento("span", inicial);
+    no.append(letra);
+    no.setAttribute("aria-hidden", "true");
+    if (src) {
+      const img = document.createElement("img");
+      img.alt = "";
+      img.hidden = true;
+      img.addEventListener("load", () => {
+        letra.hidden = true;
+        img.hidden = false;
+      }, { once: true });
+      img.addEventListener("error", () => img.remove(), { once: true });
+      img.src = src;
+      no.append(img);
+    }
+    avatares.set(atleta.id, { src, inicial, no });
+    return no;
+  }
+
+  let assinaturaTabela = "";
   function renderizarTabela(dados, grupoSelecionado) {
+    const atletas = dados.inscricoes.filter(atleta => atleta.grupo === grupoSelecionado);
+    const assinatura = JSON.stringify([atletas, dados.pista?.inscricao_id, dados.pista?.volta, dados.pista?.estado]);
+    if (assinatura === assinaturaTabela) return;
+    assinaturaTabela = assinatura;
+    const ids = new Set(atletas.map(atleta => atleta.id));
+    for (const id of avatares.keys()) {
+      if (!ids.has(id)) avatares.delete(id);
+    }
     const pista = dados.pista;
-    const linhas = dados.inscricoes
-      .filter((atleta) => atleta.grupo === grupoSelecionado)
+    const linhas = atletas
       .map((atleta) => {
         const linha = elemento("tr");
         const ativo = pista?.inscricao_id === atleta.id;
         if (ativo) linha.className = "ativo";
         const nome = elemento("td", "", "nome");
-        nome.append(
-          elemento("span", `#${atleta.numero_provisorio}`, "numero texto-ranking"),
-          elemento("span", atleta.nome, "texto-ranking"),
-        );
+        const competidor = elemento("span", "", "competidor-ranking");
+        competidor.append(avatar(atleta), elemento("span", atleta.nome, "texto-ranking"));
+        nome.append(competidor);
         const celulas = [1, 2].map((volta) => {
           const td = elemento("td");
           td.append(elemento("span", formatarNota(atleta[`v${volta}`]), "texto-ranking"));
