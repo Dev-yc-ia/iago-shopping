@@ -41,7 +41,10 @@ enabled = false
 enabled = false
 
 [edge_runtime]
-enabled = false
+enabled = true
 
 [analytics]
 enabled = false
+
+[functions.iago-api]
+verify_jwt = false
