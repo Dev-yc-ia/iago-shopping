@@ -1,6 +1,7 @@
 """Ranking público e rotas privadas do cadastro e das notas."""
 
 import json
+from dataclasses import replace
 from datetime import date
 from typing import Annotated
 from uuid import UUID
@@ -21,7 +22,8 @@ class CadastroSkatista(BaseModel):
     escola: str = Field(max_length=200)
     nascimento: date
     sexo: str = Field(max_length=20)
-    categoria: str = Field(max_length=200)
+    categoria: str | None = Field(default=None, max_length=200)
+    categorias: list[str] | None = Field(default=None, min_length=1, max_length=4)
 
 
 router = APIRouter(prefix="/api")
@@ -74,6 +76,14 @@ async def ler_cadastro(request, settings, *, edicao=False):
     try:
         bruto = json.loads(conteudo)
         dados = CadastroSkatista.model_validate(bruto)
+        if ("categoria" in bruto) == ("categorias" in bruto):
+            raise ValueError
+        categorias = dados.categorias if "categorias" in bruto else [dados.categoria]
+        if not categorias or any(not isinstance(valor, str) for valor in categorias):
+            raise ValueError
+        categorias = [valor.strip() for valor in categorias]
+        if len(set(categorias)) != len(categorias):
+            raise ValueError
         if (
             not isinstance(bruto.get("nascimento"), str)
             or bruto["nascimento"] != dados.nascimento.isoformat()
@@ -89,14 +99,18 @@ async def ler_cadastro(request, settings, *, edicao=False):
                 dados.nascimento,
                 dados.nascimento.year,
                 dados.sexo,
-                dados.categoria,
+                categorias[0],
             ),
             settings.evento_codigo,
             1,
         )
     except ValueError as erro:
         raise HTTPException(422, str(erro)) from None
-    return registro, avatar.foto(bruto, edicao=edicao)
+    return (
+        registro,
+        categorias if "categorias" in bruto else None,
+        avatar.foto(bruto, edicao=edicao),
+    )
 
 
 @router.post("/skatistas")
@@ -104,11 +118,17 @@ async def cadastrar_skatista(
     request: Request,
     settings: Annotated[Settings, Depends(get_settings)],
 ):
-    registro, png = await ler_cadastro(request, settings)
+    registro, categorias, png = await ler_cadastro(request, settings)
     return await run_in_threadpool(
         consultar,
         lambda config: cadastro_skatistas.gravar_lote(
-            config, request, [(1, registro)], png
+            config,
+            request,
+            [
+                (1, replace(registro, categoria=categoria))
+                for categoria in (categorias or [registro.categoria])
+            ],
+            png,
         ),
         settings,
     )
@@ -120,11 +140,11 @@ async def editar_skatista(
     request: Request,
     settings: Annotated[Settings, Depends(get_settings)],
 ):
-    registro, png = await ler_cadastro(request, settings, edicao=True)
+    registro, categorias, png = await ler_cadastro(request, settings, edicao=True)
     return await run_in_threadpool(
         consultar,
         lambda config: cadastro_skatistas.editar(
-            config, request, inscricao_id, registro, png
+            config, request, inscricao_id, registro, categorias, png
         ),
         settings,
     )

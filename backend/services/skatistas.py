@@ -16,7 +16,7 @@ def credenciamento(settings: Settings) -> dict:
     with read_connection(settings) as connection:
         rows = connection.execute(
             """
-            SELECT i.id, i.numero_provisorio, s.nome, s.escola,
+            SELECT i.id, i.skatista_id, i.numero_provisorio, s.nome, s.escola,
                    s.data_nascimento, s.ano_nascimento, s.sexo_confirmado,
                    base.codigo AS categoria_base, f.versao AS avatar_versao
             FROM cadastro.inscricoes AS i
@@ -39,6 +39,7 @@ def credenciamento(settings: Settings) -> dict:
         "inscricoes": [
             {
                 "id": str(row["id"]),
+                "skatista_id": str(row["skatista_id"]),
                 "numero_provisorio": row["numero_provisorio"],
                 "nome": row["nome"],
                 "escola": row["escola"],

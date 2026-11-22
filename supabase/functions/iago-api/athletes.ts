@@ -58,106 +58,91 @@ export async function parseFile(name: string, data: Uint8Array, codigo: string, 
   if (!entries.length) fail(422, "A planilha está vazia.");
   return entries;
 }
+function enrollmentError(error: unknown, line?: number): never {
+  const code = errorCode(error);
+  if (code === "23505") fail(409, "Já existe inscrição nessa categoria.");
+  if (code === "IA404" || code === "IA409" || code === "IA422") {
+    const message = error instanceof Error ? error.message : "Falha ao salvar inscrição.";
+    fail(Number(code.slice(2)), line === undefined ? message : `Linha ${line}: ${message}`);
+  }
+  throw error;
+}
+
 async function save({ sql, request, codigo }: Context, entries: Entry[], png?: ReturnType<typeof photo>) {
   return await sql.begin("read write", async (c) => {
     await session(c, request, { role: "master", lock: true });
     await c`SELECT pg_advisory_xact_lock(hashtext(${codigo}))`;
     const [event] = await c`SELECT id FROM cadastro.eventos WHERE codigo=${codigo}`;
     if (!event) fail(409, "Evento sem cadastro.");
-    const categories = new Map((await c`SELECT id,codigo FROM cadastro.categorias
-      WHERE evento_id=${event.id}`).map((r) => [r.codigo, r.id]));
-    const existing = new Map((await c`SELECT i.chave_origem,s.escola,s.sexo_confirmado,i.categoria_base_id
-      FROM cadastro.inscricoes i JOIN cadastro.skatistas s ON s.id=i.skatista_id
-      WHERE i.evento_id=${event.id} AND i.chave_origem::text=ANY(${c.array(entries.map((e) => e.key), 25)})`
-    ).map((r) => [r.chave_origem, [r.escola, r.sexo_confirmado, r.categoria_base_id]]));
-    const newEntries = [];
+    let incluidos = 0;
     let duplicados = 0;
+    let person: string | undefined;
+    let newPerson = false;
     for (const entry of entries) {
-      const category = categories.get(entry.categoria);
-      if (!category) fail(422, `Linha ${entry.line}: categoria-base indisponível no evento.`);
-      const fields = [entry.escola, entry.sexo, category];
-      const previous = existing.get(entry.key);
-      if (previous) {
-        if (fields.some((value, i) => value !== previous[i])) {
-          fail(409, `Linha ${entry.line}: identidade já cadastrada com dados divergentes.`);
-        }
-        duplicados++;
-      } else {
-        existing.set(entry.key, fields);
-        newEntries.push({ ...entry, category });
+      try {
+        const [row] = await c`SELECT * FROM cadastro.incluir_inscricao(${event.id},${entry.key},
+          ${entry.nome},${entry.escola},${entry.nascimento},${entry.sexo},${entry.categoria})`;
+        person = row.pessoa;
+        newPerson ||= row.pessoa_nova;
+        if (row.incluido) incluidos++;
+        else duplicados++;
+      } catch (error) {
+        enrollmentError(error, entry.line);
       }
     }
-    if (png && duplicados) fail(409, "Cadastro existente. Use Editar para publicar uma foto.");
-    const [{ numero }] = await c`SELECT coalesce(max(numero_provisorio),0) AS numero
-      FROM cadastro.inscricoes WHERE evento_id=${event.id}`;
-    // Batch insertion with explicit IDs avoids depending on a database driver's RETURNING order.
-    if (newEntries.length) {
-      const records = newEntries.map((entry, i) => ({ ...entry, id: crypto.randomUUID(), numero: numero + i + 1 }));
-      await c`INSERT INTO cadastro.skatistas ${c(records.map((r) => ({
-        id: r.id, nome: r.nome, escola: r.escola, data_nascimento: r.nascimento, sexo_confirmado: r.sexo,
-      })), "id", "nome", "escola", "data_nascimento", "sexo_confirmado")}`;
-      await c`INSERT INTO cadastro.inscricoes ${c(records.map((r) => ({
-        evento_id: event.id, skatista_id: r.id, chave_origem: r.key, categoria_base_id: r.category, numero_provisorio: r.numero,
-      })), "evento_id", "skatista_id", "chave_origem", "categoria_base_id", "numero_provisorio")}`;
-      if (png) await savePhoto(c, records[0].id, png);
+    if (png && person) {
+      if (!newPerson) fail(409, "Cadastro existente. Use Editar para publicar uma foto.");
+      await savePhoto(c, person, png);
     }
-    return { incluidos: newEntries.length, duplicados };
+    return { incluidos, duplicados };
   });
 }
 const today = () => new Date().toISOString().slice(0, 10);
 async function manual(data: Body, codigo: string) {
+  const legacy = !Object.hasOwn(data, "categorias");
+  const selected = legacy ? [data.categoria] : data.categorias;
+  if ((!legacy && Object.hasOwn(data, "categoria")) || !Array.isArray(selected) ||
+      selected.length < 1 || selected.length > 4 ||
+      !selected.every((value) => typeof value === "string")) {
+    fail(422, "Selecione de uma a quatro categorias válidas e distintas.");
+  }
+  const categories: string[] = selected.map((value) => value.trim());
+  if (new Set(categories).size !== categories.length) {
+    fail(422, "Selecione de uma a quatro categorias válidas e distintas.");
+  }
   const birth = date(data.nascimento);
-  return await validateRow([
+  const entry = await validateRow([
     string(data, "nome", 200), string(data, "escola", 200), birth, birth.slice(0, 4),
-    string(data, "sexo", 20), string(data, "categoria", 200),
+    string(data, "sexo", 20), categories[0],
   ], codigo, 1, today());
+  return { entry, categories, legacy };
 }
 export async function createAthlete(ctx: Context) {
   await session(ctx.sql, ctx.request, { role: "master" });
   const data = await body(ctx.request, athleteBodyLimit);
-  return await save(ctx, [await manual(data, ctx.codigo)], photo(data));
+  const { entry, categories } = await manual(data, ctx.codigo);
+  return await save(ctx, categories.map((categoria) => ({ ...entry, categoria })), photo(data));
 }
 
 export async function updateAthlete(ctx: Context, id: string) {
   const { sql, request, codigo } = ctx;
   await session(sql, request, { role: "master" });
   const data = await body(request, athleteBodyLimit);
-  const entry = await manual(data, codigo);
+  const { entry, categories, legacy } = await manual(data, codigo);
   const png = photo(data, true);
   try {
     return await sql.begin("read write", async (c) => {
       const event = await lockEvent(c, codigo);
       await session(c, request, { role: "master", lock: true });
       await c`SELECT pg_advisory_xact_lock(hashtext(${codigo}))`;
-      const [current] = await c`SELECT i.skatista_id,s.nome,s.escola,
-        s.data_nascimento::text AS nascimento,s.sexo_confirmado, i.categoria_base_id
-        FROM cadastro.inscricoes i JOIN cadastro.skatistas s ON s.id=i.skatista_id
-        WHERE i.id=${id} AND i.evento_id=${event} FOR UPDATE OF s`;
-      if (!current) fail(404, "Inscrição não encontrada.");
-      const [category] = await c`SELECT id FROM cadastro.categorias WHERE evento_id=${event} AND codigo=${entry.categoria}`;
-      if (!category) fail(422, "Categoria-base indisponível no evento.");
-      const [active] = await c`SELECT 1 FROM operacao.tentativas
-        WHERE inscricao_id=${id} AND estado IN ('chamada','aberta')`;
-      if (active) fail(409, "Conclua ou cancele a volta em pista antes de editar.");
-      const identityChanged = current.nome !== entry.nome || current.nascimento !== entry.nascimento;
-      const fieldsChanged = identityChanged || current.escola !== entry.escola || current.sexo_confirmado !== entry.sexo;
-      if (fieldsChanged || png !== undefined) {
-        const [other] = await c`SELECT 1 FROM cadastro.inscricoes
-          WHERE skatista_id=${current.skatista_id} AND id<>${id} LIMIT 1`;
-        if (other) fail(409, "Skatista com outras inscrições. Apenas a categoria-base pode ser editada nesta ficha.");
-      }
-      if (fieldsChanged) await c`UPDATE cadastro.skatistas SET nome=${entry.nome},escola=${entry.escola},
-        data_nascimento=${entry.nascimento},sexo_confirmado=${entry.sexo} WHERE id=${current.skatista_id}`;
-      if (identityChanged) await c`UPDATE cadastro.inscricoes SET chave_origem=${entry.key} WHERE id=${id}`;
-      if (category.id !== current.categoria_base_id) {
-        await c`UPDATE cadastro.inscricoes SET categoria_base_id=${category.id} WHERE id=${id}`;
-      }
-      await savePhoto(c, current.skatista_id, png);
+      const [{ pessoa }] = await c`SELECT cadastro.editar_inscricoes(${event},${id},${entry.key},
+        ${entry.nome},${entry.escola},${entry.nascimento},${entry.sexo},
+        ${c.array(categories, 25)},${legacy},${png !== undefined}) AS pessoa`;
+      await savePhoto(c, pessoa, png);
       return { atualizado: true };
     });
   } catch (error) {
-    if (errorCode(error) === "23505") fail(409, "Já existe cadastro com esse nome e nascimento.");
-    throw error;
+    enrollmentError(error);
   }
 }
 export async function importAthletes(ctx: Context) {
@@ -170,7 +155,7 @@ export async function importAthletes(ctx: Context) {
 export async function athletes({ sql, request, codigo }: Context) {
   return await sql.begin("isolation level repeatable read read only", async (c) => {
     await session(c, request, { role: "master" });
-    const inscricoes = await c`SELECT i.id,i.numero_provisorio,s.nome,s.escola,s.data_nascimento::text,
+    const inscricoes = await c`SELECT i.id,i.skatista_id,i.numero_provisorio,s.nome,s.escola,s.data_nascimento::text,
       s.ano_nascimento,s.sexo_confirmado,base.codigo AS categoria_base,f.versao AS avatar_versao
       FROM cadastro.inscricoes i JOIN cadastro.eventos e ON e.id=i.evento_id
       JOIN cadastro.skatistas s ON s.id=i.skatista_id

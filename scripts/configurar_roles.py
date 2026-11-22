@@ -36,6 +36,29 @@ def conceder_operacao(connection):
             connection.execute(
                 "REVOKE ALL ON cadastro.fotos_skatistas FROM iago_importador"
             )
+    funcoes = (
+        (
+            "cadastro.incluir_inscricao(uuid,text,text,text,date,text,text)",
+            "iago_runtime",
+        ),
+        (
+            "cadastro.editar_inscricoes(uuid,uuid,text,text,text,date,text,text[],boolean,boolean)",
+            "iago_runtime",
+        ),
+        ("cadastro.retirar_inscricao(uuid,uuid)", "iago_runtime"),
+        ("cadastro.provisionar_categorias(uuid)", "iago_importador"),
+    )
+    for assinatura, papel in funcoes:
+        funcao, existe_papel = connection.execute(
+            "SELECT to_regprocedure(%s), EXISTS (SELECT 1 FROM pg_roles WHERE rolname=%s)",
+            (assinatura, papel),
+        ).fetchone()
+        if funcao and existe_papel:
+            connection.execute(
+                sql.SQL("GRANT EXECUTE ON FUNCTION {} TO {}").format(
+                    sql.SQL(assinatura), sql.Identifier(papel)
+                )
+            )
     connection.execute("GRANT USAGE ON SCHEMA operacao TO iago_runtime")
     connection.execute("REVOKE ALL ON ALL TABLES IN SCHEMA operacao FROM iago_runtime")
     if connection.execute("SELECT to_regclass('operacao.notas_por_dia')").fetchone()[0]:

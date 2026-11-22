@@ -17,6 +17,7 @@ const remover = document.getElementById("remover-foto");
 const previa = document.getElementById("previa-foto");
 const { nascimento, foto, foto_autorizada: autorizacao } = cadastro.elements;
 const lado = 128;
+const grupoCategorias = document.getElementById("categorias-cadastro");
 
 let editando = null;
 let botaoEdicao = null;
@@ -63,7 +64,9 @@ function preencher(item = null, botao = null) {
     cadastro.elements.escola.value = item.escola;
     nascimento.value = item.data_nascimento;
     cadastro.elements.sexo.value = item.sexo_confirmado;
-    cadastro.elements.categoria.value = item.categoria_base;
+    for (const opcao of grupoCategorias.querySelectorAll("input")) {
+      opcao.checked = item.categorias.includes(opcao.value);
+    }
     painel.open = true;
     cadastro.elements.nome.focus();
   }
@@ -76,15 +79,19 @@ async function carregar() {
   try {
     await carregarSessao();
     const { inscricoes, categorias } = await obterSkatistas();
-    const categoria = cadastro.elements.categoria;
-    const selecionada = categoria.value;
-    categoria.replaceChildren(
-      new Option("Selecione", ""),
-      ...categorias.map(valor => new Option(valor, valor)),
-    );
-    if (categorias.includes(selecionada)) categoria.value = selecionada;
+    const selecionadas = new FormData(cadastro).getAll("categorias");
+    grupoCategorias.replaceChildren(...categorias.map(valor => {
+      const rotulo = document.createElement("label");
+      const opcao = document.createElement("input");
+      opcao.type = "checkbox";
+      opcao.name = "categorias";
+      opcao.value = valor;
+      opcao.checked = selecionadas.includes(valor);
+      rotulo.append(opcao, " " + valor);
+      return rotulo;
+    }));
     carga.textContent = inscricoes.length ? `${inscricoes.length} inscrições` : "Cadastro vazio.";
-    renderizarSkatistas(inscricoes, lista, (item, botao) => {
+    renderizarSkatistas(inscricoes, categorias, lista, (item, botao) => {
       if (enviando) return;
       resultado.textContent = "";
       preencher(item, botao);
@@ -181,9 +188,16 @@ cadastro.addEventListener("submit", async evento => {
   evento.preventDefault();
   if (processando || enviando) return;
   const campos = new FormData(cadastro);
+  const categorias = campos.getAll("categorias");
+  if (!categorias.length) {
+    resultado.textContent = "Selecione pelo menos uma categoria.";
+    grupoCategorias.querySelector("input")?.focus();
+    return;
+  }
   const dados = Object.fromEntries(
-    ["nome", "escola", "nascimento", "sexo", "categoria"].map(nome => [nome, campos.get(nome)]),
+    ["nome", "escola", "nascimento", "sexo"].map(nome => [nome, campos.get(nome)]),
   );
+  dados.categorias = categorias;
   if (imagem) Object.assign(dados, { foto_rgba: imagem, foto_autorizada: autorizacao.checked });
   else if (fotoRemovida) dados.foto_rgba = null;
 
