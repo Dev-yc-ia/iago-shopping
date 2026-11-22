@@ -1,31 +1,28 @@
-# Ambiente
+/dados_privados/
 .env
 .env.*
 !.env.example
-
-# Python
 .venv/
-venv/
 __pycache__/
 *.py[cod]
 .pytest_cache/
-.mypy_cache/
+*.log
+*.dump
+*.backup
+*.sql.gz
+/supabase/.temp/
+/supabase/.branches/
+/work/
+/dumps/
+/backups/
+/logs/
 .ruff_cache/
-
-# Build
-dist/
-build/
-
-# Node
-node_modules/
-
-# IDE
-.vscode/
-.idea/
-
-# Sistema
-.DS_Store
-Thumbs.db
-
-# Testes locais
-antigo/
+*.xlsx
+*.csv
+# Testes e ferramentas de desenvolvimento
+/tests/
+/requirements-dev.txt
+/.coverage
+/htmlcov/
+/test-results/
+/playwright-report/

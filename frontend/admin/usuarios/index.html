@@ -1,0 +1,104 @@
+<!doctype html>
+
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width,initial-scale=1" name="viewport" />
+    <title>Administração de usuários · Iago System ACSN</title>
+    <link href="../../assets/logos/logo-acsn.png" rel="icon" />
+    <link href="../../css/base.css" rel="stylesheet" />
+    <link href="../../css/formularios.css" rel="stylesheet" />
+  </head>
+  <body data-visao="publico">
+    <header class="topo">
+      <a class="marca" href="../../">
+        <img
+          alt="ACSN"
+          class="marca-emblema"
+          src="../../assets/logos/logo-acsn.png"
+        />
+        <span>
+          <span class="marca-nome">
+            <img
+              alt="IAGO"
+              class="marca-iago"
+              src="../../assets/logos/IAGO_.png"
+            />
+            <span>SYSTEM</span>
+          </span>
+          <small>ACSN · SKATE CONTEST</small>
+        </span>
+      </a>
+      <div class="conta" id="conta">
+        <a class="botao-entrar" href="../../login/">Entrar</a>
+      </div>
+      <button aria-controls="menu" aria-expanded="false" id="menu-toggle">
+        Menu
+      </button>
+    </header>
+    <div class="estrutura">
+      <nav aria-label="Navegação principal" id="menu">
+        <p class="eyebrow">Área master</p>
+        <a href="../../">Ranking</a
+        ><a href="../../skatistas/">Cadastro de skatistas</a
+        ><a aria-current="page" href="../../admin/usuarios/"
+          >Administração de usuários</a
+        >
+      </nav>
+      <main>
+        <header class="pagina">
+          <div>
+            <p class="eyebrow">Equipe · Master</p>
+            <h1>A equipe por trás das voltas.</h1>
+            <p class="suave">
+              Juízes ativos entram na banca das próximas liberações.
+            </p>
+          </div>
+        </header>
+        <section class="painel formulario">
+          <h2>Cadastrar juiz</h2>
+          <form id="cadastro-juiz">
+            <div class="campos">
+              <label
+                >Nome<input
+                  autocomplete="off"
+                  id="nome"
+                  maxlength="120"
+                  required="" /></label
+              ><label
+                >Login<input
+                  autocomplete="off"
+                  id="login-juiz"
+                  maxlength="60"
+                  minlength="3"
+                  required="" /></label
+              ><label
+                >Senha inicial<input
+                  autocomplete="new-password"
+                  id="senha-juiz"
+                  maxlength="128"
+                  minlength="6"
+                  required=""
+                  type="password"
+              /></label>
+            </div>
+            <p class="suave">
+              Use ao menos 6 caracteres com maiúscula, minúscula, número e
+              símbolo. O juiz deverá trocar a senha no primeiro acesso.
+            </p>
+            <button class="primario" id="salvar">Cadastrar juiz</button>
+          </form>
+          <p class="feedback" id="feedback" role="status"></p>
+        </section>
+        <section class="painel controle">
+          <h2>Juízes cadastrados</h2>
+          <p id="carga" role="status">Carregando contas…</p>
+          <button hidden="" id="tentar">Tentar novamente</button>
+          <div class="lista-contas" id="usuarios"></div>
+        </section>
+      </main>
+    </div>
+    <script src="../../js/menu.js" type="module"></script>
+    <script src="../../js/pages/usuarios.js" type="module"></script>
+  </body>
+</html>

@@ -1,0 +1,97 @@
+<!doctype html>
+
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width,initial-scale=1" name="viewport" />
+    <title>Alterar senha · Iago System ACSN</title>
+    <link href="../assets/logos/logo-acsn.png" rel="icon" />
+    <link href="../css/base.css" rel="stylesheet" />
+    <link href="../css/formularios.css" rel="stylesheet" />
+  </head>
+  <body data-visao="publico">
+    <header class="topo">
+      <a class="marca" href="../">
+        <img
+          alt="ACSN"
+          class="marca-emblema"
+          src="../assets/logos/logo-acsn.png"
+        />
+        <span>
+          <span class="marca-nome">
+            <img
+              alt="IAGO"
+              class="marca-iago"
+              src="../assets/logos/IAGO_.png"
+            />
+            <span>SYSTEM</span>
+          </span>
+          <small>ACSN · SKATE CONTEST</small>
+        </span>
+      </a>
+      <div class="conta" id="conta">
+        <a class="botao-entrar" href="../login/">Entrar</a>
+      </div>
+      <button aria-controls="menu" aria-expanded="false" id="menu-toggle">
+        Menu
+      </button>
+    </header>
+    <div class="estrutura">
+      <nav aria-label="Navegação principal" id="menu">
+        <p class="eyebrow">Área master</p>
+        <a href="../">Ranking</a
+        ><a href="../skatistas/">Cadastro de skatistas</a
+        ><a href="../admin/usuarios/">Administração de usuários</a>
+      </nav>
+      <main>
+        <header class="pagina">
+          <div>
+            <p class="eyebrow">Segurança da conta</p>
+            <h1>Altere sua senha.</h1>
+            <p class="suave" id="obrigatoria">
+              Use uma senha pessoal. Outras sessões serão encerradas.
+            </p>
+          </div>
+        </header>
+        <section class="painel formulario">
+          <form id="alterar-senha">
+            <div class="campos">
+              <label
+                >Senha atual<input
+                  autocomplete="current-password"
+                  id="atual"
+                  maxlength="128"
+                  required=""
+                  type="password" /></label
+              ><label
+                >Nova senha<input
+                  autocomplete="new-password"
+                  id="nova"
+                  maxlength="128"
+                  minlength="6"
+                  required=""
+                  type="password" /></label
+              ><label
+                >Confirmar nova senha<input
+                  autocomplete="new-password"
+                  id="confirmacao"
+                  maxlength="128"
+                  minlength="6"
+                  required=""
+                  type="password"
+              /></label>
+            </div>
+            <p class="suave">
+              Use de 6 a 128 caracteres com maiúscula, minúscula, número e
+              símbolo.
+            </p>
+            <button class="primario" id="salvar">Alterar senha</button>
+          </form>
+          <p class="feedback" id="feedback" role="status"></p>
+        </section>
+      </main>
+    </div>
+    <script src="../js/menu.js" type="module"></script>
+    <script src="../js/pages/alterar-senha.js" type="module"></script>
+  </body>
+</html>
