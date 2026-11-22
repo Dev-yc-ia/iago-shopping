@@ -24,7 +24,7 @@ CABECALHO = [
     "sexo_confirmado",
     "categoria_base_idade",
 ]
-CATEGORIAS = {"2ª": 3, "3ª": 3, "4ª": 6}
+DISTRIBUICAO_LEGADA = {"2ª": 3, "3ª": 3, "4ª": 6}
 
 
 @dataclass(frozen=True, repr=False)
@@ -74,7 +74,10 @@ def validar_csv(caminho: Path, evento: str) -> list[Registro]:
                     raise ValueError(
                         f"Linha {linha}: data ISO ou ano incoerente."
                     ) from None
-                if categoria not in CATEGORIAS or sexo not in {"Feminino", "Masculino"}:
+                if categoria not in DISTRIBUICAO_LEGADA or sexo not in {
+                    "Feminino",
+                    "Masculino",
+                }:
                     raise ValueError(
                         f"Linha {linha}: categoria ou sexo confirmado inválido."
                     )
@@ -92,7 +95,10 @@ def validar_csv(caminho: Path, evento: str) -> list[Registro]:
         raise ValueError(
             "CSV inválido: use UTF-8 e delimitador ponto e vírgula."
         ) from None
-    if len(registros) != 12 or Counter(r.categoria for r in registros) != CATEGORIAS:
+    if (
+        len(registros) != 12
+        or Counter(r.categoria for r in registros) != DISTRIBUICAO_LEGADA
+    ):
         raise ValueError("Esperados 12 registros e distribuição de categorias 3/3/6.")
     if len({r.chave for r in registros}) != len(registros):
         raise ValueError("Identidade duplicada no CSV; nenhuma alteração foi aplicada.")
@@ -103,6 +109,12 @@ def gravar_registro(connection, evento_id, categorias, registro, existente, nume
     """Reexecução atualiza atributos, preservando ID e número provisório."""
     if existente:
         skatista_id = existente["skatista_id"]
+        if connection.execute(
+            """SELECT 1 FROM cadastro.inscricoes
+            WHERE skatista_id=%s AND evento_id<>%s LIMIT 1""",
+            (skatista_id, evento_id),
+        ).fetchone():
+            raise ValueError("Skatista com inscrições em outro evento.")
         connection.execute(
             """
             UPDATE cadastro.skatistas
@@ -117,26 +129,20 @@ def gravar_registro(connection, evento_id, categorias, registro, existente, nume
                 skatista_id,
             ),
         )
-        connection.execute(
+    else:
+        skatista_id = connection.execute(
             """
-            UPDATE cadastro.inscricoes SET categoria_base_id = %s
-            WHERE evento_id = %s AND chave_origem = %s
+            INSERT INTO cadastro.skatistas (nome, escola, data_nascimento, sexo_confirmado)
+            VALUES (%s, %s, %s, %s) RETURNING id
             """,
-            (categorias[registro.categoria], evento_id, registro.chave),
-        )
-        return
-    skatista_id = connection.execute(
-        """
-        INSERT INTO cadastro.skatistas (nome, escola, data_nascimento, sexo_confirmado)
-        VALUES (%s, %s, %s, %s) RETURNING id
-        """,
-        (registro.nome, registro.escola, registro.nascimento, registro.sexo),
-    ).fetchone()[0]
+            (registro.nome, registro.escola, registro.nascimento, registro.sexo),
+        ).fetchone()[0]
     connection.execute(
         """
         INSERT INTO cadastro.inscricoes (
             evento_id, skatista_id, chave_origem, categoria_base_id, numero_provisorio
         ) VALUES (%s, %s, %s, %s, %s)
+        ON CONFLICT (evento_id, skatista_id, categoria_base_id) DO NOTHING
         """,
         (
             evento_id,
@@ -161,34 +167,34 @@ def importar(caminho: Path, database_url: str, evento: str) -> dict:
             """,
             (evento,),
         ).fetchone()[0]
-        categorias = {}
-        for ordem, codigo in enumerate(CATEGORIAS, start=1):
-            categorias[codigo] = connection.execute(
-                """
-                INSERT INTO cadastro.categorias (evento_id, codigo, ordem)
-                VALUES (%s, %s, %s)
-                ON CONFLICT (evento_id, codigo) DO UPDATE SET ordem = EXCLUDED.ordem
-                RETURNING id
-                """,
-                (evento_id, codigo, ordem),
-            ).fetchone()[0]
+        connection.execute("SELECT cadastro.provisionar_categorias(%s)", (evento_id,))
+        categorias = dict(
+            connection.execute(
+                "SELECT codigo, id FROM cadastro.categorias WHERE evento_id=%s",
+                (evento_id,),
+            ).fetchall()
+        )
         existentes = {
-            chave: {"skatista_id": skatista_id, "numero": numero}
-            for chave, skatista_id, numero in connection.execute(
+            chave: {"skatista_id": skatista_id}
+            for chave, skatista_id in connection.execute(
                 """
-                SELECT chave_origem, skatista_id, numero_provisorio
+                SELECT DISTINCT chave_origem, skatista_id
                 FROM cadastro.inscricoes WHERE evento_id = %s
                 """,
                 (evento_id,),
             ).fetchall()
         }
-        # Não adivinhar renomeações/nascimentos corrigidos nem excluir pessoas.
-        # Identidades divergentes exigem revisão explícita autorizada no banco.
-        if existentes and set(existentes) != {r.chave for r in registros}:
+        # A carga inicial continua exigindo revisão se uma identidade histórica
+        # deixar de ser encontrada. Novas inscrições do Master podem coexistir.
+        if existentes and not {r.chave for r in registros} <= existentes.keys():
             raise ValueError(
                 "Identidades divergentes: revise a correção explicitamente antes da carga."
             )
-        for numero, registro in enumerate(registros, start=1):
+        maior_numero = connection.execute(
+            "SELECT coalesce(max(numero_provisorio), 0) FROM cadastro.inscricoes WHERE evento_id=%s",
+            (evento_id,),
+        ).fetchone()[0]
+        for numero, registro in enumerate(registros, start=maior_numero + 1):
             gravar_registro(
                 connection,
                 evento_id,

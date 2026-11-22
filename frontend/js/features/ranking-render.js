@@ -164,7 +164,7 @@ export function criarVisualizacao() {
       dados.inscricoes
         .map((a) => ({
           valor: a.id,
-          rotulo: `#${a.numero_provisorio} · ${a.nome}`,
+          rotulo: `#${a.numero_provisorio} · ${a.nome} · ${a.categoria}`,
         })),
     );
     const selecionado = dados.inscricoes.find((a) => a.id === dom.atleta.value);

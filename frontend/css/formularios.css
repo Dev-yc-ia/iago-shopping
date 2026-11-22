@@ -48,3 +48,18 @@
 .ficha dd {
   margin: 0;
 }
+
+#categorias-cadastro {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+#categorias-cadastro label {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  gap: 5px;
+}
+#categorias-cadastro input {
+  width: auto;
+}

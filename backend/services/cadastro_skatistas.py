@@ -9,6 +9,7 @@ from zipfile import BadZipFile, ZipFile
 from fastapi import HTTPException
 from openpyxl import load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
+from psycopg import Error
 from psycopg.errors import UniqueViolation
 
 from backend.db import write_connection
@@ -134,9 +135,10 @@ def ler_planilha(nome, conteudo, evento):
 
 
 def gravar_lote(settings, request, registros, png=MANTER):
+    incluidos = duplicados = 0
+    pessoa_nova = False
     with write_connection(settings) as c:
         sessao(c, request, perfil="master", bloquear=True)
-        # Compartilha a trava de alocação com o importador inicial.
         c.execute(
             "SELECT pg_advisory_xact_lock(hashtext(%s))", (settings.evento_codigo,)
         )
@@ -145,75 +147,42 @@ def gravar_lote(settings, request, registros, png=MANTER):
         ).fetchone()
         if not evento:
             raise HTTPException(409, "Evento sem cadastro.")
-        evento_id = evento["id"]
-        categorias = {
-            row["codigo"]: row["id"]
-            for row in c.execute(
-                "SELECT id,codigo FROM cadastro.categorias WHERE evento_id=%s",
-                (evento_id,),
-            )
-        }
-        existentes = {
-            row["chave_origem"]: (
-                row["escola"],
-                row["sexo_confirmado"],
-                row["categoria_base_id"],
-            )
-            for row in c.execute(
-                """SELECT i.chave_origem,s.escola,s.sexo_confirmado,i.categoria_base_id
-                FROM cadastro.inscricoes i JOIN cadastro.skatistas s ON s.id=i.skatista_id
-                WHERE i.evento_id=%s""",
-                (evento_id,),
-            )
-        }
-        novos = []
-        duplicados = 0
         for linha, registro in registros:
-            if registro.categoria not in categorias:
-                raise HTTPException(
-                    422, f"Linha {linha}: categoria-base indisponível no evento."
-                )
-            atributos = (registro.escola, registro.sexo, categorias[registro.categoria])
-            if registro.chave in existentes:
-                if existentes[registro.chave] != atributos:
+            try:
+                inscricao = c.execute(
+                    "SELECT * FROM cadastro.incluir_inscricao(%s,%s,%s,%s,%s,%s,%s)",
+                    (
+                        evento["id"],
+                        registro.chave,
+                        registro.nome,
+                        registro.escola,
+                        registro.nascimento,
+                        registro.sexo,
+                        registro.categoria,
+                    ),
+                ).fetchone()
+            except Error as erro:
+                if erro.sqlstate in {"IA409", "IA422"}:
                     raise HTTPException(
-                        409,
-                        f"Linha {linha}: identidade já cadastrada com dados divergentes.",
-                    )
+                        int(erro.sqlstate[2:]),
+                        f"Linha {linha}: {erro.diag.message_primary}",
+                    ) from None
+                raise
+            pessoa_nova = pessoa_nova or inscricao["pessoa_nova"]
+            if inscricao["incluido"]:
+                incluidos += 1
+            else:
                 duplicados += 1
-                continue
-            existentes[registro.chave] = atributos
-            novos.append(registro)
-        if png is not MANTER and duplicados:
-            raise HTTPException(
-                409, "Cadastro existente. Use Editar para publicar uma foto."
-            )
-        maior_numero = c.execute(
-            "SELECT coalesce(max(numero_provisorio),0) AS numero FROM cadastro.inscricoes WHERE evento_id=%s",
-            (evento_id,),
-        ).fetchone()["numero"]
-        for numero, registro in enumerate(novos, maior_numero + 1):
-            skatista = c.execute(
-                """INSERT INTO cadastro.skatistas(nome,escola,data_nascimento,sexo_confirmado)
-                VALUES (%s,%s,%s,%s) RETURNING id""",
-                (registro.nome, registro.escola, registro.nascimento, registro.sexo),
-            ).fetchone()
-            c.execute(
-                """INSERT INTO cadastro.inscricoes(evento_id,skatista_id,chave_origem,categoria_base_id,numero_provisorio)
-                VALUES (%s,%s,%s,%s,%s)""",
-                (
-                    evento_id,
-                    skatista["id"],
-                    registro.chave,
-                    categorias[registro.categoria],
-                    numero,
-                ),
-            )
-            gravar_foto(c, skatista["id"], png)
-    return {"incluidos": len(novos), "duplicados": duplicados}
+        if png is not MANTER:
+            if not pessoa_nova:
+                raise HTTPException(
+                    409, "Cadastro existente. Use Editar para publicar uma foto."
+                )
+            gravar_foto(c, inscricao["pessoa"], png)
+    return {"incluidos": incluidos, "duplicados": duplicados}
 
 
-def editar(settings, request, inscricao_id, registro, png=MANTER):
+def editar(settings, request, inscricao_id, registro, categorias=None, png=MANTER):
     try:
         with write_connection(settings) as c:
             evento = bloquear_evento(c, settings)
@@ -221,69 +190,28 @@ def editar(settings, request, inscricao_id, registro, png=MANTER):
             c.execute(
                 "SELECT pg_advisory_xact_lock(hashtext(%s))", (settings.evento_codigo,)
             )
-            atual = c.execute(
-                """SELECT i.skatista_id,s.nome,s.escola,s.data_nascimento,s.sexo_confirmado,
-                          i.categoria_base_id
-                FROM cadastro.inscricoes i JOIN cadastro.skatistas s ON s.id=i.skatista_id
-                WHERE i.id=%s AND i.evento_id=%s FOR UPDATE OF s""",
-                (inscricao_id, evento),
+            pessoa = c.execute(
+                "SELECT cadastro.editar_inscricoes(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) AS id",
+                (
+                    evento,
+                    inscricao_id,
+                    registro.chave,
+                    registro.nome,
+                    registro.escola,
+                    registro.nascimento,
+                    registro.sexo,
+                    categorias or [registro.categoria],
+                    categorias is None,
+                    png is not MANTER,
+                ),
             ).fetchone()
-            if not atual:
-                raise HTTPException(404, "Inscrição não encontrada.")
-            categoria = c.execute(
-                "SELECT id FROM cadastro.categorias WHERE evento_id=%s AND codigo=%s",
-                (evento, registro.categoria),
-            ).fetchone()
-            if not categoria:
-                raise HTTPException(422, "Categoria-base indisponível no evento.")
-            if c.execute(
-                "SELECT 1 FROM operacao.tentativas WHERE inscricao_id=%s AND estado IN ('chamada','aberta')",
-                (inscricao_id,),
-            ).fetchone():
-                raise HTTPException(
-                    409, "Conclua ou cancele a volta em pista antes de editar."
-                )
-            identidade = (
-                atual["nome"] != registro.nome
-                or atual["data_nascimento"] != registro.nascimento
-            )
-            dados = (
-                identidade
-                or atual["escola"] != registro.escola
-                or atual["sexo_confirmado"] != registro.sexo
-            )
-            if (dados or png is not MANTER) and c.execute(
-                "SELECT 1 FROM cadastro.inscricoes WHERE skatista_id=%s AND id<>%s LIMIT 1",
-                (atual["skatista_id"], inscricao_id),
-            ).fetchone():
-                raise HTTPException(
-                    409,
-                    "Skatista com outras inscrições. Apenas a categoria-base pode ser editada nesta ficha.",
-                )
-            if dados:
-                c.execute(
-                    "UPDATE cadastro.skatistas SET nome=%s,escola=%s,data_nascimento=%s,sexo_confirmado=%s WHERE id=%s",
-                    (
-                        registro.nome,
-                        registro.escola,
-                        registro.nascimento,
-                        registro.sexo,
-                        atual["skatista_id"],
-                    ),
-                )
-            if identidade:
-                c.execute(
-                    "UPDATE cadastro.inscricoes SET chave_origem=%s WHERE id=%s",
-                    (registro.chave, inscricao_id),
-                )
-            if categoria["id"] != atual["categoria_base_id"]:
-                c.execute(
-                    "UPDATE cadastro.inscricoes SET categoria_base_id=%s WHERE id=%s",
-                    (categoria["id"], inscricao_id),
-                )
-            gravar_foto(c, atual["skatista_id"], png)
+            gravar_foto(c, pessoa["id"], png)
     except UniqueViolation:
-        raise HTTPException(
-            409, "Já existe cadastro com esse nome e nascimento."
-        ) from None
+        raise HTTPException(409, "Já existe inscrição nessa categoria.") from None
+    except Error as erro:
+        if erro.sqlstate in {"IA404", "IA409", "IA422"}:
+            raise HTTPException(
+                int(erro.sqlstate[2:]), erro.diag.message_primary
+            ) from None
+        raise
     return {"atualizado": True}
