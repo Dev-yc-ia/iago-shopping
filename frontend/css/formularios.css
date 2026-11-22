@@ -1,0 +1,50 @@
+.formulario {
+  max-width: 720px;
+}
+.campos {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+.formulario input,
+.formulario select {
+  width: 100%;
+  min-width: 0;
+}
+.formulario small {
+  display: block;
+  margin-bottom: 22px;
+}
+.formulario input:disabled {
+  opacity: 0.6;
+}
+@media (max-width: 550px) {
+  .campos {
+    grid-template-columns: 1fr;
+  }
+}
+.lista-skatistas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr));
+  gap: 18px;
+}
+.ficha {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.ficha h2 {
+  margin-bottom: 10px;
+}
+.ficha dl {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 8px 12px;
+  font-size: 14px;
+}
+.ficha dt {
+  color: var(--suave);
+}
+.ficha dd {
+  margin: 0;
+}

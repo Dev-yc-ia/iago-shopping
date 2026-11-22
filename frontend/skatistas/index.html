@@ -1,0 +1,95 @@
+<!doctype html>
+
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width,initial-scale=1" name="viewport" />
+    <title>Cadastro de skatistas · Iago System ACSN</title>
+    <link href="../assets/logos/logo-acsn.png" rel="icon" />
+    <link href="../css/base.css" rel="stylesheet" />
+    <link href="../css/formularios.css" rel="stylesheet" />
+  </head>
+  <body data-visao="publico">
+    <header class="topo">
+      <a class="marca" href="../">
+        <img
+          alt="ACSN"
+          class="marca-emblema"
+          src="../assets/logos/logo-acsn.png"
+        />
+        <span>
+          <span class="marca-nome">
+            <img
+              alt="IAGO"
+              class="marca-iago"
+              src="../assets/logos/IAGO_.png"
+            />
+            <span>SYSTEM</span>
+          </span>
+          <small>ACSN · SKATE CONTEST</small>
+        </span>
+      </a>
+      <div class="conta" id="conta">
+        <a class="botao-entrar" href="../login/">Entrar</a>
+      </div>
+      <button aria-controls="menu" aria-expanded="false" id="menu-toggle">
+        Menu
+      </button>
+    </header>
+    <div class="estrutura">
+      <nav aria-label="Navegação principal" id="menu">
+        <p class="eyebrow">Área master</p>
+        <a href="../">Ranking</a
+        ><a aria-current="page" href="../skatistas/">Cadastro de skatistas</a
+        ><a href="../admin/usuarios/">Administração de usuários</a>
+      </nav>
+      <main>
+        <header class="pagina">
+          <div>
+            <h1>Cadastro de skatistas</h1>
+          </div>
+        </header>
+        <details class="painel">
+          <summary>Cadastrar skatista</summary>
+          <form id="cadastro">
+            <label>Nome <input name="nome" required maxlength="200" /></label>
+            <label>Escola <input name="escola" required maxlength="200" /></label>
+            <label>Nascimento <input type="date" name="nascimento" min="1900-01-01" required /></label>
+            <label>Ano <output id="ano"></output></label>
+            <label>Sexo confirmado <select name="sexo" required>
+              <option value="">Selecione</option><option>Feminino</option><option>Masculino</option>
+            </select></label>
+            <label>Categoria-base <select name="categoria" required></select></label>
+            <button>Cadastrar</button>
+          </form>
+        </details>
+        <details class="painel">
+          <summary>Importar planilha</summary>
+          <p>Use a primeira aba do XLSX ou um CSV UTF-8 separado por ponto e vírgula.
+            Informe a data em AAAA-MM-DD ou como célula de data do Excel.</p>
+          <a download="modelo_skatistas.csv" href="data:text/csv;charset=utf-8,atleta%3Bescola%3Bdata_nascimento%3Bano_nascimento%3Bsexo_confirmado%3Bcategoria_base_idade%0D%0A">Baixar modelo CSV</a>
+          <form id="importacao">
+            <label>Arquivo <input type="file" name="arquivo" accept=".csv,.xlsx" required /></label>
+            <button>Importar</button>
+          </form>
+        </details>
+        <p id="resultado-cadastro" role="status"></p>
+        <div class="situacao-carga">
+          <p aria-live="polite" id="carga" role="status">
+            Carregando credenciamento local…
+          </p>
+          <button hidden="" id="tentar">Tentar novamente</button>
+        </div>
+        <section
+          aria-label="Inscrições locais"
+          class="lista-skatistas"
+          id="lista-skatistas"
+        ></section>
+        <footer class="rodape">ACSN / Iago System · Campeonato local</footer>
+      </main>
+    </div>
+    <script src="../js/menu.js" type="module"></script>
+    <script src="../js/pages/skatistas.js" type="module"></script>
+    <script src="../js/core/sessao.js" type="module"></script>
+  </body>
+</html>

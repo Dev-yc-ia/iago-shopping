@@ -1,16 +1,50 @@
-project_id = "iago-shopping"
+# Instância exclusiva; nenhum serviço público ou autenticação nesta entrega.
+project_id = "iago_system"
 
-[functions.payment-engine]
-verify_jwt = false
+[api]
+enabled = false
+port = 54321
+schemas = ["public"]
 
-[functions.payment-create]
-verify_jwt = false
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 17
+health_timeout = "2m"
 
-[functions.payment-sync]
-verify_jwt = false
+[db.migrations]
+enabled = true
+schema_paths = []
 
-[functions.payment-cancel]
-verify_jwt = false
+[db.seed]
+enabled = false
+sql_paths = []
 
-[functions.mercado-pago-webhook]
+[db.network_restrictions]
+enabled = true
+allowed_cidrs = ["127.0.0.1/32"]
+allowed_cidrs_v6 = ["::1/128"]
+
+[studio]
+enabled = false
+
+[auth]
+enabled = false
+
+[storage]
+enabled = false
+
+[realtime]
+enabled = false
+
+[local_smtp]
+enabled = false
+
+[edge_runtime]
+enabled = true
+
+[analytics]
+enabled = false
+
+[functions.iago-api]
 verify_jwt = false

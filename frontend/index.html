@@ -1,12 +1,147 @@
 <!doctype html>
+
 <html lang="pt-BR">
-<head>
-  <meta charset="utf-8">
-  <meta http-equiv="refresh" content="0; url=catalogo/">
-  <title>IAGO Shopping</title>
-</head>
-<body>
-  <a href="/admin/" hidden>Admin</a>
-  <p>Redirecionando para o catálogo...</p>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width,initial-scale=1" name="viewport" />
+    <title>Ranking · Iago System ACSN</title>
+    <link href="./assets/logos/logo-acsn.png" rel="icon" />
+    <link href="./css/base.css" rel="stylesheet" />
+    <link href="./css/ranking.css" rel="stylesheet" />
+  </head>
+  <body data-visao="publico">
+    <header class="topo">
+      <a class="marca" href="./">
+        <img
+          alt="ACSN"
+          class="marca-emblema"
+          src="./assets/logos/logo-acsn.png"
+        />
+        <span>
+          <span class="marca-nome">
+            <img alt="IAGO" class="marca-iago" src="./assets/logos/IAGO_.png" />
+            <span>SYSTEM</span>
+          </span>
+          <small>ACSN · SKATE CONTEST</small>
+        </span>
+      </a>
+      <div class="conta" id="conta">
+        <a class="botao-entrar" href="./login/">Entrar</a>
+      </div>
+      <button aria-controls="menu" aria-expanded="false" id="menu-toggle">
+        Menu
+      </button>
+    </header>
+    <div class="estrutura">
+      <nav aria-label="Navegação principal" id="menu">
+        <p class="eyebrow">Área master</p>
+        <a aria-current="page" href="./">Ranking</a
+        ><a href="./skatistas/">Cadastro de skatistas</a
+        ><a href="./admin/usuarios/">Administração de usuários</a>
+      </nav>
+      <main>
+        <header class="pagina ranking-topo">
+          <div class="identidade-campeonato">
+            <img alt="JEN" src="./assets/logos/logo-jen-canto.png" />
+          </div>
+          <div class="filtros-ranking" id="filtros-ranking" role="group" aria-label="Categorias do ranking"></div>
+        </header>
+        <div class="situacao-carga">
+          <p aria-live="polite" id="carga" role="status">
+            Carregando cadastro local…
+          </p>
+          <button hidden="" id="tentar">Tentar novamente</button>
+        </div>
+        <section aria-label="Ranking por categoria" class="placar">
+          <div class="placar-topo">
+            <div>
+              <span class="eyebrow">Classificação</span>
+              <h2 id="titulo-categoria">Classificação local</h2>
+            </div>
+            <span class="status" id="status">Aguardando chamada</span>
+          </div>
+          <div
+            aria-atomic="true"
+            aria-live="polite"
+            class="pista"
+            role="status"
+          >
+            <span class="ponto"></span
+            ><span id="pista"
+              >Pista livre · aguardando o próximo competidor</span
+            >
+          </div>
+          <table>
+            <caption class="suave"><span class="texto-ranking">
+              Números provisórios · Duas voltas. A melhor média define a
+              classificação.
+            </span></caption>
+            <thead>
+              <tr>
+                <th scope="col"><span class="texto-ranking">Pos.</span></th>
+                <th scope="col"><span class="texto-ranking">Competidor</span></th>
+                <th scope="col"><span class="texto-ranking">V1</span></th>
+                <th scope="col"><span class="texto-ranking">V2</span></th>
+                <th scope="col"><span class="texto-ranking">NF</span></th>
+              </tr>
+            </thead>
+            <tbody id="ranking"></tbody>
+          </table>
+          <div class="legenda"><span class="texto-ranking">
+            Posição provisória com uma média · NF após as duas voltas · Empates
+            compartilham posição
+          </span></div>
+        </section>
+        <section class="painel controle" hidden="" id="master">
+          <p class="eyebrow">Controle da pista</p>
+          <h2>Uma volta de cada vez.</h2>
+          <form id="chamada">
+            <label>Competidor<select id="atleta"></select></label
+            ><label
+              >Volta<select id="volta">
+                <option value="1">V1</option>
+                <option value="2">V2</option>
+              </select></label
+            ><button class="primario" id="liberar" type="submit">
+              Liberar votação</button
+            ><button id="chamar" type="button">Colocar na pista</button>
+          </form>
+          <p class="contador" id="contador"></p>
+          <p class="suave" id="pendentes"></p>
+          <form hidden="" id="cancelamento">
+            <label
+              >Motivo do cancelamento<input
+                id="motivo"
+                maxlength="500"
+                minlength="3"
+                required="" /></label
+            ><button id="cancelar">Cancelar tentativa</button>
+          </form>
+        </section>
+        <section class="painel controle" hidden="" id="juiz">
+          <p class="eyebrow">Banca · Escala 0–100</p>
+          <h2>Envie sua nota.</h2>
+          <p class="suave" id="orientacao">Aguarde a liberação do master.</p>
+          <form id="votacao">
+            <label
+              >Nota<input
+                autocomplete="off"
+                id="nota"
+                inputmode="decimal"
+                maxlength="6"
+                placeholder="0,00"
+                required="" /></label
+            ><button class="primario" id="enviar">
+              Conferir e enviar nota
+            </button>
+          </form>
+          <p class="suave" id="recibo" role="status"></p>
+        </section>
+        <p aria-live="polite" class="feedback" id="feedback" role="status"></p>
+        <footer class="rodape">ACSN / Iago System · Campeonato local</footer>
+      </main>
+    </div>
+    <script src="./js/menu.js" type="module"></script>
+    <script src="./js/pages/ranking.js" type="module"></script>
+  </body>
 </html>
